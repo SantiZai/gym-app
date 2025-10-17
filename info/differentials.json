@@ -1,0 +1,102 @@
+[
+  {
+    "id": 1,
+    "titulo_principal": "Tu Progreso, Desbloqueado: Más Allá de las Repeticiones y los Kilos.",
+    "subtitulo": "Deja de medir tu esfuerzo solo con la balanza. Visualiza tu evolución real con métricas que importan y un seguimiento que entiende tu cuerpo.",
+    "descripcion_general": "¿Cansado de sentir que te estancas a pesar de tu esfuerzo? Las apps tradicionales se enfocan en cuánto levantas o cuánto corres, pero el verdadero progreso es multidimensional. Nuestra plataforma te ofrece un Panel de Evolución Integral que va más allá.",
+    "puntos_clave": [
+      {
+        "titulo": "Análisis de Rendimiento por Músculo",
+        "detalle": "Visualiza gráficamente qué tan seguido y con qué intensidad trabajas cada grupo muscular. Identifica desbalances y asegura un desarrollo armónico."
+      },
+      {
+        "titulo": "Métricas de Consistencia y Volumen",
+        "detalle": "No solo registres tus récords personales. Mide tu volumen de entrenamiento (series x reps x peso) a lo largo del tiempo y celebra tu constancia, el verdadero motor del cambio."
+      },
+      {
+        "titulo": "Archivo Fotográfico Inteligente",
+        "detalle": "Compara tus fotos de progreso de forma anónima y segura, con herramientas que te permiten alinear imágenes para ver cambios sutiles en tu composición corporal que la balanza ignora."
+      },
+      {
+        "titulo": "Sensaciones y Notas de Sesión",
+        "detalle": "¿Cómo te sentiste hoy? ¿Dormiste bien? Registra variables subjetivas para entender cómo tu estilo de vida impacta tu rendimiento y descubre patrones que te ayudarán a optimizar tus entrenamientos."
+      }
+    ],
+    "llamada_a_la_accion": "Tu esfuerzo merece ser reconocido en todas sus formas. Empieza a ver la imagen completa de tu progreso."
+  },
+  {
+    "id": 2,
+    "titulo_principal": "Biblioteca de Rutinas Viva: Creada por la Comunidad, Validada por Expertos.",
+    "subtitulo": "Accede a un universo de rutinas que funcionan. Encuentra, adapta y comparte entrenamientos de una comunidad apasionada, con un sello de calidad que te da confianza.",
+    "descripcion_general": "El estancamiento y el aburrimiento son los mayores enemigos de tu rutina. ¿Por qué limitarte a las mismas 10 rutinas de siempre? Te presentamos una comunidad donde la inspiración nunca se acaba.",
+    "puntos_clave": [
+      {
+        "titulo": "Explora y Filtra con Precisión",
+        "detalle": "Busca rutinas por objetivo (hipertrofia, fuerza, resistencia), por equipamiento disponible (gimnasio completo, solo mancuernas, peso corporal) o incluso por el tiempo que tienes disponible."
+      },
+      {
+        "titulo": "Sistema de Popularidad y Efectividad",
+        "detalle": "Las rutinas creadas por la comunidad son calificadas y comentadas, y aquellas con mayor tasa de finalización y feedback positivo suben a la cima."
+      },
+      {
+        "titulo": "Sello 'Validado por Entrenadores'",
+        "detalle": "Colaboramos con profesionales del fitness que revisan y destacan las rutinas más seguras y efectivas. Entrena con la tranquilidad de saber que sigues un plan bien estructurado."
+      },
+      {
+        "titulo": "'Forking' de Rutinas",
+        "detalle": "¿Te gusta una rutina pero quieres cambiar un ejercicio? Con nuestra función 'Adaptar', puedes duplicar cualquier rutina de la comunidad a tu perfil y modificarla a tu gusto."
+      }
+    ],
+    "llamada_a_la_accion": "Únete a una comunidad que no solo entrena, sino que innova. Tu próxima rutina favorita te está esperando."
+  },
+  {
+    "id": 3,
+    "titulo_principal": "Gestión de Sesiones Inteligente: Menos Tiempo Administrando, Más Tiempo Entrenando.",
+    "subtitulo": "Tu tiempo en el gimnasio es sagrado. Con nuestra app, tu única preocupación será darlo todo en cada serie. La planificación y el registro son automáticos e intuitivos.",
+    "descripcion_general": "Sabemos que parte de la energía se pierde antes de levantar la primera pesa: decidiendo qué hacer y anotando todo en el móvil. Hemos diseñado una experiencia fluida para que te concentres en lo que importa.",
+    "puntos_clave": [
+      {
+        "titulo": "Modo 'Hoy Toca'",
+        "detalle": "Al abrir la app, te mostraremos directamente la sesión de entrenamiento planificada para hoy. Con un solo toque, inicias el registro. Sin distracciones."
+      },
+      {
+        "titulo": "Historial al Instante",
+        "detalle": "Al llegar a un ejercicio, la app te mostrará automáticamente el peso y las repeticiones de tu última sesión. Superar tus marcas nunca fue tan fácil."
+      },
+      {
+        "titulo": "Temporizador de Descanso Automático y Adaptativo",
+        "detalle": "El cronómetro de descanso se inicia solo al completar una serie y puede sugerir tiempos diferentes según el tipo de ejercicio."
+      },
+      {
+        "titulo": "Flexibilidad en Vivo",
+        "detalle": "¿La máquina que necesitas está ocupada? Con nuestra función 'Sustituir Ejercicio', te ofrecemos al instante alternativas que trabajan el mismo grupo muscular."
+      }
+    ],
+    "llamada_a_la_accion": "Optimiza cada minuto en el gimnasio. Tu asistente de entrenamiento personal ya está listo."
+  },
+  {
+    "id": 4,
+    "titulo_principal": "De Usuario a Creador: Construye, Comparte y Monetiza tu Pasión.",
+    "subtitulo": "No solo sigas un plan, conviértete en el arquitecto de tus rutinas y las de otros. Diseña, comparte y, si lo deseas, ofrece tus programas de entrenamiento a la comunidad.",
+    "descripcion_general": "Si eres de los que diseñan sus propias rutinas, experimentan y ayudan a sus amigos, ¿por qué no llevarlo al siguiente nivel? Nuestra plataforma te da las herramientas para que pases de ser un simple usuario a un creador influyente.",
+    "puntos_clave": [
+      {
+        "titulo": "Constructor de Rutinas Visual e Intuitivo",
+        "detalle": "Arrastra y suelta ejercicios, añade notas, videos explicativos y define series, repeticiones y descansos con una facilidad sin precedentes."
+      },
+      {
+        "titulo": "Tu Perfil Público de Creador",
+        "detalle": "Comparte tus rutinas de forma pública. Otros usuarios podrán seguirlas, calificarlas y comentar. Construye tu reputación basada en la calidad de tus planes."
+      },
+      {
+        "titulo": "Marketplace de Rutinas (Opcional)",
+        "detalle": "Para los entrenadores verificados y creadores populares, abrimos la posibilidad de ofrecer programas de entrenamiento premium para monetizar su conocimiento."
+      },
+      {
+        "titulo": "Feedback Detallado",
+        "detalle": "Recibe estadísticas sobre cuántas personas han completado tus rutinas y cuál ha sido su feedback, permitiéndote refinar y mejorar tus creaciones."
+      }
+    ],
+    "llamada_a_la_accion": "Tu conocimiento tiene valor. Inspira a otros y deja tu marca en la comunidad fitness."
+  }
+]
