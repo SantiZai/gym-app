@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X, Dumbbell, User as UserIcon, LogOut, ChevronDown } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
-import { signOut } from "@/app/(login)/actions";
+import { createClient } from "@/utils/supabase/client";
+import { redirect, useRouter } from "next/navigation";
 
 const navLinks = [
   { href: "/", label: "Inicio" },
@@ -24,31 +26,41 @@ export function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { user } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Chequear si un link está activo
+  const isActiveLink = (href: string) => {
+    if (href === "/") {
+      return pathname === "/";
+    }
+    return pathname?.startsWith(href);
+  };
 
   // Detectar scroll para agregar sombra y ocultar/mostrar navbar en mobile
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      
+
       // Agregar sombra cuando hay scroll
       setScrolled(currentScrollY > 10);
-      
+
       // Solo aplicar auto-hide en mobile (cuando el menú no está abierto)
       if (!isOpen) {
         // Si está en el top, siempre mostrar
         if (currentScrollY < 10) {
           setIsVisible(true);
-        } 
+        }
         // Si scrollea hacia abajo, ocultar
         else if (currentScrollY > lastScrollY && currentScrollY > 80) {
           setIsVisible(false);
-        } 
+        }
         // Si scrollea hacia arriba, mostrar
         else if (currentScrollY < lastScrollY) {
           setIsVisible(true);
         }
       }
-      
+
       setLastScrollY(currentScrollY);
     };
 
@@ -87,17 +99,23 @@ export function Navbar() {
   }, [isDropdownOpen]);
 
   const handleSignOut = async () => {
-    await signOut();
+    try {
+      const supabase = await createClient();
+      await supabase.auth.signOut();
+      // El hook useAuth detectará automáticamente el cambio de estado
+      // y actualizará la UI antes de navegar
+      router.push("/login");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   return (
     <>
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 bg-white transition-all duration-300 ${
-          scrolled ? "shadow-md" : ""
-        } ${
-          isVisible && !isOpen ? "translate-y-0" : "-translate-y-full"
-        } md:translate-y-0`}
+        className={`fixed top-0 left-0 right-0 z-50 bg-white transition-all duration-300 ${scrolled ? "shadow-md" : ""
+          } ${isVisible && !isOpen ? "translate-y-0" : "-translate-y-full"
+          } md:translate-y-0`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -121,11 +139,15 @@ export function Navbar() {
 
             {/* Links y perfil a la derecha - Desktop */}
             <div className="hidden md:flex items-center space-x-6">
-              {navLinks.map((link) => (
+              {user && navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="text-gray-700 hover:text-blue-600 font-medium transition-colors duration-200"
+                  className={`font-medium transition-colors duration-200 ${
+                    isActiveLink(link.href)
+                      ? "text-blue-600 font-semibold"
+                      : "text-gray-700 hover:text-blue-600"
+                  }`}
                 >
                   {link.label}
                 </Link>
@@ -152,9 +174,8 @@ export function Navbar() {
                     <span className="text-sm font-medium text-gray-700 capitalize">
                       {user?.name || "Usuario"}
                     </span>
-                    <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform duration-200 flex-shrink-0 ${
-                      isDropdownOpen ? "rotate-180" : ""
-                    }`} />
+                    <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform duration-200 flex-shrink-0 ${isDropdownOpen ? "rotate-180" : ""
+                      }`} />
                   </button>
 
                   {/* Dropdown menu */}
@@ -190,34 +211,44 @@ export function Navbar() {
             </div>
 
             {/* Botón hamburguesa - Mobile */}
-            <button
-              onClick={() => setIsOpen(!isOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 ml-auto"
-              aria-label="Toggle menu"
-            >
-              {isOpen ? (
-                <X className="h-6 w-6 text-gray-700" />
+            {
+              user ? (
+                <button
+                  onClick={() => setIsOpen(!isOpen)}
+                  className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 ml-auto"
+                  aria-label="Toggle menu"
+                >
+                  {isOpen ? (
+                    <X className="h-6 w-6 text-gray-700" />
+                  ) : (
+                    <Menu className="h-6 w-6 text-gray-700" />
+                  )}
+                </button>
               ) : (
-                <Menu className="h-6 w-6 text-gray-700" />
-              )}
-            </button>
+                <button
+                onClick={() => redirect("/login")}
+                  className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 ml-auto"
+                  aria-label="Toggle menu"
+                >
+                  <UserIcon className="h-6 w-6 text-gray-700" />
+                </button>
+              )
+            }
           </div>
         </div>
       </nav>
 
       {/* Overlay oscuro */}
       <div
-        className={`fixed inset-0 bg-black/50 z-[45] transition-opacity duration-300 md:hidden ${
-          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
+        className={`fixed inset-0 bg-black/50 z-[45] transition-opacity duration-300 md:hidden ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
         onClick={() => setIsOpen(false)}
       />
 
       {/* Menú lateral - Mobile */}
       <div
-        className={`fixed top-0 right-0 h-full w-[280px] bg-white z-50 shadow-2xl transform transition-transform duration-300 ease-in-out md:hidden ${
-          isOpen ? "translate-x-0" : "translate-x-full"
-        }`}
+        className={`fixed top-0 right-0 h-full w-[280px] bg-white z-50 shadow-2xl transform transition-transform duration-300 ease-in-out md:hidden ${isOpen ? "translate-x-0" : "translate-x-full"
+          }`}
       >
         {/* Header del menú */}
         <div className="flex items-center justify-between p-4 border-b">
@@ -242,9 +273,15 @@ export function Navbar() {
                 <Link
                   href={link.href}
                   onClick={() => setIsOpen(false)}
-                  className="group flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:text-blue-600 font-medium transition-all duration-300"
+                  className={`group flex items-center space-x-3 px-4 py-3 rounded-xl font-medium transition-all duration-300 ${
+                    isActiveLink(link.href)
+                      ? "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-600 font-semibold"
+                      : "text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:text-blue-600"
+                  }`}
                 >
-                  <span className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-600"></span>
+                  <span className={`flex-shrink-0 w-2 h-2 rounded-full ${
+                    isActiveLink(link.href) ? "bg-blue-600" : "bg-gray-400 group-hover:bg-blue-600"
+                  }`}></span>
                   <span className="flex-1">{link.label}</span>
                 </Link>
               </li>
@@ -255,31 +292,43 @@ export function Navbar() {
         {/* Footer del menú */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-white">
           {user ? (
-            <Link
-              href="/profile"
-              onClick={() => setIsOpen(false)}
-              className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200"
-            >
-              <div className="relative flex-shrink-0">
-                {user?.avatar_url ? (
-                  <img
-                    src={user.avatar_url}
-                    alt={user.name || "User"}
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
-                    {user?.name?.charAt(0).toUpperCase() || "U"}
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {user?.name || "Usuario"}
-                </p>
-                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-              </div>
-            </Link>
+            <div className="space-y-2">
+              <Link
+                href="/profile"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+              >
+                <div className="relative flex-shrink-0">
+                  {user?.avatar_url ? (
+                    <img
+                      src={user.avatar_url}
+                      alt={user.name || "User"}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                      {user?.name?.charAt(0).toUpperCase() || "U"}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {user?.name || "Usuario"}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                </div>
+              </Link>
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  handleSignOut();
+                }}
+                className="flex items-center space-x-3 p-3 rounded-lg hover:bg-red-50 transition-colors duration-200 w-full text-left"
+              >
+                <LogOut className="h-5 w-5 text-red-600" />
+                <span className="text-sm font-medium text-red-600">Cerrar sesión</span>
+              </button>
+            </div>
           ) : (
             <Link
               href="/login"
