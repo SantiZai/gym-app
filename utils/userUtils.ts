@@ -18,7 +18,7 @@ export const upsertUser = async (supabaseUser: any): Promise<User> => {
     email,
     name: name || email.split("@")[0],
     avatar_url: userAvatar || "",
-    unit: null,
+    unit: "metric",
     updated_at: new Date().toISOString(),
     last_login: new Date().toISOString(),
   };
