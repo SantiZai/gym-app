@@ -12,7 +12,7 @@ import { redirect, useRouter } from "next/navigation";
 const navLinks = [
   { href: "/", label: "Inicio" },
   { href: "/rutinas", label: "Rutinas" },
-  { href: "/ejercicios", label: "Ejercicios" },
+  { href: "/comunidad", label: "Comunidad" },
   { href: "/progreso", label: "Progreso" },
   { href: "/perfil", label: "Perfil" },
 ];
