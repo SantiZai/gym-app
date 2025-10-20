@@ -1,0 +1,656 @@
+"use client";
+
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+    getSessionData,
+    completeSessionSerie,
+    finishSession,
+    cancelSession,
+    getLastPerformedByExerciseIds,
+    updateOrCreateSessionSerie,
+} from "@/utils/sessionUtils";
+import type { RoutineExerciseWithDetails, Serie, Session, SessionSerie } from "@/types/db";
+import {
+    CheckCircle2,
+    Circle,
+    Timer,
+    Dumbbell,
+    X,
+    Check,
+    Play,
+    AlertCircle,
+} from "lucide-react";
+import { useSessionTimer } from "@/hooks/useSessionTimer";
+
+export default function SessionPage() {
+    const params = useParams();
+    const router = useRouter();
+    const sessionId = params?.sessionId as string;
+
+    const [session, setSession] = useState<Session | null>(null);
+    const [routineExercises, setRoutineExercises] = useState<RoutineExerciseWithDetails[]>(
+        []
+    );
+    const [sessionSeries, setSessionSeries] = useState<SessionSerie[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [finishing, setFinishing] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
+
+    const { elapsedTime, formatElapsedTime } = useSessionTimer(session);
+
+    // Estados para editar pesos y reps
+    const [lastPerformedByExercise, setLastPerformedByExercise] = useState<Record<string, {
+        weight_used: number | null;
+        reps_performed: number | null;
+        completed_at: string | null;
+    }>>({});
+
+    // Estado para valores actuales de peso y reps por serie
+    const [serieValues, setSerieValues] = useState<Record<string, {
+        weight: string;
+        reps: string;
+    }>>({});
+
+    // Refs para debouncing
+    const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
+
+    // Cargar datos de la sesión
+    const loadSessionData = useCallback(async () => {
+        try {
+            setLoading(true);
+            const data = await getSessionData(sessionId);
+
+            // data should contain: session, routineExercises, sessionSeries
+            const sessionObj = data.session;
+            const routineExercisesArr = data.routineExercises || [];
+            const sessionSeriesArr = data.sessionSeries || [];
+
+            // Transform the data: Supabase returns exercise as an array sometimes, normalize to object
+            const transformedRoutineExercises = routineExercisesArr.map((re: any) => ({
+                ...re,
+                exercise: Array.isArray(re.exercise) ? re.exercise[0] : re.exercise
+            })) as RoutineExerciseWithDetails[];
+
+            // set base states
+            setSession(sessionObj);
+            setRoutineExercises(transformedRoutineExercises);
+            setSessionSeries(sessionSeriesArr);
+
+            // Inicializar valores de peso y reps para cada serie
+            const initialValues: Record<string, { weight: string; reps: string }> = {};
+            transformedRoutineExercises.forEach((re: any) => {
+                re.series.forEach((serie: any) => {
+                    const completedData = sessionSeriesArr.find(
+                        (ss: SessionSerie) => ss.serie_id === serie.id && ss.completed
+                    );
+                    initialValues[serie.id] = {
+                        weight: completedData?.weight_used != null
+                            ? String(completedData.weight_used)
+                            : serie.weight != null ? String(serie.weight) : "",
+                        reps: completedData?.reps_performed != null
+                            ? String(completedData.reps_performed)
+                            : serie.reps != null ? String(serie.reps) : "",
+                    };
+                });
+            });
+            setSerieValues(initialValues);
+
+            // Construir lista de exercise ids a consultar:
+            const idsFromRoutine = transformedRoutineExercises
+                .map((re) => re.exercise?.id)
+                .filter(Boolean) as string[];
+
+            const idsFromSeries = sessionSeriesArr
+                .map((ss: SessionSerie) => ss.exercise_id)
+                .filter(Boolean) as string[];
+
+            const allIds = Array.from(new Set([...idsFromRoutine, ...idsFromSeries]));
+
+            if (allIds.length > 0) {
+                try {
+                    const lastRows: any[] = await getLastPerformedByExerciseIds(allIds);
+                    // lastRows puede ser [] o un array de filas con exercise_id, weight_used, reps_performed, completed_at
+                    const mapLast: Record<string, {
+                        weight_used: number | null;
+                        reps_performed: number | null;
+                        completed_at: string | null;
+                    }> = {};
+
+                    (lastRows || []).forEach((r) => {
+                        if (!r || !r.exercise_id) return;
+                        mapLast[r.exercise_id] = {
+                            weight_used: r.weight_used ?? null,
+                            reps_performed: r.reps_performed ?? null,
+                            completed_at: r.completed_at ? String(r.completed_at) : null
+                        };
+                    });
+
+                    setLastPerformedByExercise(mapLast);
+                } catch (err) {
+                    console.error("Error fetching last performed by exercises:", err);
+                }
+            } else {
+                // limpiar si no hay ids
+                setLastPerformedByExercise({});
+            }
+
+        } catch (error) {
+            console.error("Error cargando sesión:", error);
+            alert("Error al cargar la sesión");
+            router.push("/rutinas");
+        } finally {
+            setLoading(false);
+        }
+    }, [sessionId, router]);
+
+    useEffect(() => {
+        if (sessionId) {
+            loadSessionData();
+        }
+    }, [sessionId, loadSessionData]);
+
+    // Verificar si una serie está completada
+    const isSerieCompleted = (serieId: string) => {
+        return sessionSeries.some(
+            (ss) => ss.serie_id === serieId && ss.completed
+        );
+    };
+
+    // Actualizar valores de serie en tiempo real con debouncing
+    const updateSerieValueInDB = useCallback(async (
+        serieId: string,
+        exerciseId: string,
+        weight: string,
+        reps: string
+    ) => {
+        try {
+            const weightNum = weight ? parseFloat(weight) : null;
+            const repsNum = reps ? parseInt(reps) : null;
+
+            await updateOrCreateSessionSerie(sessionId, serieId, exerciseId, {
+                weight_used: weightNum,
+                reps_performed: repsNum,
+            });
+
+            // Actualizar sessionSeries en el estado local sin recargar todo
+            setSessionSeries(prev => {
+                const existing = prev.find(ss => ss.serie_id === serieId);
+                if (existing) {
+                    return prev.map(ss =>
+                        ss.serie_id === serieId
+                            ? { ...ss, weight_used: weightNum, reps_performed: repsNum }
+                            : ss
+                    );
+                } else {
+                    return prev;
+                }
+            });
+        } catch (error) {
+            console.error("Error actualizando serie:", error);
+        }
+    }, [sessionId]);
+
+    // Manejar cambio en inputs con debouncing
+    const handleSerieValueChange = useCallback((
+        serieId: string,
+        exerciseId: string,
+        field: 'weight' | 'reps',
+        value: string
+    ) => {
+        // Cancelar timer anterior si existe
+        if (debounceTimers.current[serieId]) {
+            clearTimeout(debounceTimers.current[serieId]);
+        }
+
+        // Actualizar estado local inmediatamente y programar actualización en BD
+        setSerieValues(prev => {
+            const updatedValues = {
+                ...prev,
+                [serieId]: {
+                    ...prev[serieId],
+                    [field]: value,
+                }
+            };
+
+            // Crear nuevo timer para actualizar en BD después de 500ms
+            debounceTimers.current[serieId] = setTimeout(() => {
+                const weight = field === 'weight' ? value : updatedValues[serieId].weight;
+                const reps = field === 'reps' ? value : updatedValues[serieId].reps;
+                updateSerieValueInDB(serieId, exerciseId, weight, reps);
+            }, 500);
+
+            return updatedValues;
+        });
+    }, [updateSerieValueInDB]);
+
+    // Completar/descompletar serie
+    // dentro de tu componente SessionPage (reemplazar la función existente)
+    const handleCompleteSerie = useCallback(async (
+        serie: Serie,
+        exerciseId: string,
+        completed: boolean
+    ) => {
+        try {
+            // 1) cancelar cualquier timer pendiente para esta serie
+            if (debounceTimers.current[serie.id]) {
+                clearTimeout(debounceTimers.current[serie.id]);
+                delete debounceTimers.current[serie.id];
+            }
+
+            // 2) leer los valores actuales desde el estado (no usar setState para leer)
+            const current = serieValues[serie.id] || { weight: '', reps: '' };
+            const weight = current.weight ? parseFloat(current.weight) : null;
+            const reps = current.reps ? parseInt(current.reps) : null;
+
+            // 3) llamar al backend y esperar la respuesta
+            // completeSessionSerie debe devolver la fila creada/actualizada (ideal)
+            const updatedSessionSerie = await completeSessionSerie(
+                sessionId,
+                serie.id,
+                exerciseId,
+                weight,
+                reps,
+                completed
+            );
+
+            // 4) actualizar el estado local usando el resultado del backend cuando sea posible
+            setSessionSeries(prev => {
+                const existing = prev.find(ss => ss.serie_id === serie.id);
+
+                // Si el backend devolvió una fila, úsala (más fiable)
+                if (updatedSessionSerie && updatedSessionSerie.id) {
+                    if (existing) {
+                        return prev.map(ss => ss.serie_id === serie.id
+                            ? {
+                                ...ss,
+                                // mezclar valores devueltos por backend y valores locales
+                                weight_used: updatedSessionSerie.weight_used ?? weight,
+                                reps_performed: updatedSessionSerie.reps_performed ?? reps,
+                                completed: typeof updatedSessionSerie.completed !== 'undefined' ? updatedSessionSerie.completed : completed,
+                                completed_at: updatedSessionSerie.completed_at ?? (completed ? new Date().toISOString() : null),
+                                updated_at: updatedSessionSerie.updated_at ?? new Date().toISOString(),
+                            }
+                            : ss
+                        );
+                    } else {
+                        // agregar la fila devuelta por backend (mapeando campos para SessionSerie)
+                        return [
+                            ...prev,
+                            {
+                                id: updatedSessionSerie.id,
+                                session_id: updatedSessionSerie.session_id ?? sessionId,
+                                serie_id: serie.id,
+                                exercise_id: exerciseId,
+                                weight_used: updatedSessionSerie.weight_used ?? weight,
+                                reps_performed: updatedSessionSerie.reps_performed ?? reps,
+                                completed: typeof updatedSessionSerie.completed !== 'undefined' ? updatedSessionSerie.completed : completed,
+                                completed_at: updatedSessionSerie.completed_at ?? (completed ? new Date().toISOString() : null),
+                                started_at: updatedSessionSerie.started_at ?? null,
+                                created_at: updatedSessionSerie.created_at ?? new Date().toISOString(),
+                                updated_at: updatedSessionSerie.updated_at ?? new Date().toISOString(),
+                            } as SessionSerie
+                        ];
+                    }
+                }
+
+                // Si backend NO devolvió fila (fallback), actualizamos con los valores que tenemos
+                if (existing) {
+                    return prev.map(ss => ss.serie_id === serie.id
+                        ? {
+                            ...ss,
+                            weight_used: weight,
+                            reps_performed: reps,
+                            completed,
+                            completed_at: completed ? new Date().toISOString() : null,
+                            updated_at: new Date().toISOString(),
+                        }
+                        : ss
+                    );
+                } else {
+                    return [
+                        ...prev,
+                        {
+                            id: `local-${serie.id}-${Date.now()}`, // id temporal si backend no devolvió
+                            session_id: sessionId,
+                            serie_id: serie.id,
+                            exercise_id: exerciseId,
+                            weight_used: weight,
+                            reps_performed: reps,
+                            completed,
+                            completed_at: completed ? new Date().toISOString() : null,
+                            started_at: null,
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString(),
+                        } as SessionSerie
+                    ];
+                }
+            });
+
+        } catch (error) {
+            console.error("Error completando serie:", error);
+            alert("Error al completar la serie");
+        }
+    }, [sessionId, serieValues]);
+
+
+    // Limpiar timers al desmontar
+    useEffect(() => {
+        return () => {
+            Object.values(debounceTimers.current).forEach(timer => clearTimeout(timer));
+        };
+    }, []);
+
+    // Calcular progreso
+    const calculateProgress = () => {
+        const totalSeries = routineExercises.reduce((acc, re) => acc + re.series.length, 0);
+        const completedSeries = sessionSeries.filter((ss) => ss.completed).length;
+        return totalSeries > 0 ? (completedSeries / totalSeries) * 100 : 0;
+    };
+
+    // Finalizar sesión
+    const handleFinishSession = async () => {
+        try {
+            setFinishing(true);
+            await finishSession(sessionId);
+            router.push("/rutinas");
+        } catch (error) {
+            console.error("Error finalizando sesión:", error);
+            alert("Error al finalizar la sesión");
+        } finally {
+            setFinishing(false);
+        }
+    };
+
+    // Cancelar sesión
+    const handleCancelSession = async () => {
+        try {
+            setCancelling(true);
+            await cancelSession(sessionId);
+            router.push("/rutinas");
+        } catch (error) {
+            console.error("Error cancelando sesión:", error);
+            alert("Error al cancelar la sesión");
+        } finally {
+            setCancelling(false);
+        }
+    };
+
+    const getSerieTypeLabel = (type: string) => {
+        switch (type) {
+            case "normal":
+                return "Normal";
+            case "warm-up":
+                return "Calentamiento";
+            case "dropset":
+                return "Dropset";
+            default:
+                return "Otro";
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Cargando sesión...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!session) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center">
+                    <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
+                    <p className="mt-4 text-gray-600">Sesión no encontrada</p>
+                </div>
+            </div>
+        );
+    }
+
+    const progress = calculateProgress();
+    const totalSeries = routineExercises.reduce((acc, re) => acc + re.series.length, 0);
+
+    return (
+        <div className="min-h-screen bg-gray-50 pb-20">
+            {/* Header fijo */}
+            <div className="bg-white border-b sticky top-0 z-10 shadow-sm">
+                <div className="max-w-4xl mx-auto px-4 py-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">
+                                Sesión en progreso
+                            </h1>
+                            <p className="text-sm text-gray-500">
+                                {routineExercises.length} ejercicios
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
+                            <Timer className="h-5 w-5 text-blue-600" />
+                            <span className="text-xl font-mono font-bold text-blue-600">
+                                {formatElapsedTime(elapsedTime)}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Barra de progreso */}
+                    <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Progreso</span>
+                            <span className="font-semibold text-gray-900">
+                                {sessionSeries.filter((ss) => ss.completed).length} /{" "}
+                                {totalSeries}{" "}
+                                series
+                            </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                            <div
+                                className="bg-gradient-to-r from-blue-500 to-blue-600 h-full transition-all duration-500 ease-out"
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Lista de ejercicios */}
+            <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+                {routineExercises.map((routineExercise, idx) => {
+                    const totalExerciseSeries = routineExercise.series.length;
+                    const exerciseCompletedSeries = sessionSeries.filter((ss) =>
+                        ss.exercise_id == routineExercise.exercise.id && ss.completed
+                    ).length;
+                    const exerciseProgress = totalExerciseSeries > 0
+                        ? (exerciseCompletedSeries / totalExerciseSeries) * 100
+                        : 0;
+
+                    // obtener el "last performed" para este ejercicio (si existe)
+                    const lastPerformed = lastPerformedByExercise[routineExercise.exercise.id];
+
+                    return (
+                        <div
+                            key={routineExercise.id}
+                            className="bg-white rounded-lg shadow-sm border overflow-hidden"
+                        >
+                            {/* Header del ejercicio */}
+                            <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 border-b">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-3">
+                                            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-sm">
+                                                {idx + 1}
+                                            </span>
+                                            <div>
+                                                <h3 className="text-lg font-bold text-gray-900">
+                                                    {routineExercise.exercise.name}
+                                                </h3>
+                                                <div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
+                                                    {routineExercise.exercise.muscle && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Dumbbell className="h-4 w-4" />
+                                                            {routineExercise.exercise.muscle}
+                                                        </span>
+                                                    )}
+                                                    {routineExercise.exercise.equipment && (
+                                                        <span>• {routineExercise.exercise.equipment}</span>
+                                                    )}
+                                                    {/* mostrar última vez en header si existe */}
+                                                    {lastPerformed && (
+                                                        <span className="text-xs text-gray-500 ml-3">
+                                                            Última: {lastPerformed.weight_used ?? "0"} kg × {lastPerformed.reps_performed ?? "0"} ({lastPerformed.completed_at ? new Date(lastPerformed.completed_at).toLocaleDateString() : "—"})
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="text-sm font-semibold text-gray-900">
+                                            {exerciseCompletedSeries} / {totalExerciseSeries}
+                                        </span>
+                                        <div className="w-20 bg-gray-200 rounded-full h-2 mt-1">
+                                            <div
+                                                className="bg-green-500 h-full rounded-full transition-all duration-300"
+                                                style={{ width: `${exerciseProgress}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Series */}
+                            <div className="divide-y">
+                                {routineExercise.series.map((serie, serieIdx) => {
+                                    const completed = isSerieCompleted(serie.id);
+
+                                    // Obtener valores actuales del estado
+                                    const currentValues = serieValues[serie.id] || { weight: '', reps: '' };
+
+                                    return (
+                                        <div
+                                            key={serie.id}
+                                            className={`p-4 transition-colors ${completed
+                                                ? "bg-green-50"
+                                                : "bg-white hover:bg-gray-50"
+                                                }`}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                {/* Indicador de serie */}
+                                                <div className="flex items-center gap-2 min-w-[80px]">
+                                                    <div
+                                                        onClick={() => {
+                                                            if (completed) {
+                                                                // Descompletar serie
+                                                                handleCompleteSerie(
+                                                                    serie,
+                                                                    routineExercise.exercise.id,
+                                                                    false
+                                                                );
+                                                            } else {
+                                                                handleCompleteSerie(
+                                                                    serie,
+                                                                    routineExercise.exercise.id,
+                                                                    true
+                                                                );
+                                                            }
+                                                        }}
+                                                        className="p-0 h-auto"
+                                                    >
+                                                        {completed ? (
+                                                            <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />
+                                                        ) : (
+                                                            <Circle className="h-6 w-6 text-gray-300 flex-shrink-0" />
+                                                        )}
+                                                    </div>
+                                                    <span className="font-semibold text-gray-700">
+                                                        Serie {serieIdx + 1}
+                                                    </span>
+                                                </div>
+
+                                                {/* Tipo de serie */}
+                                                <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded">
+                                                    {getSerieTypeLabel(serie.type)}
+                                                </span>
+
+                                                {/* Inputs de peso y reps */}
+                                                <div className="flex-1 flex items-center gap-4">
+
+                                                    <div className="flex items-center gap-2">
+                                                        <Input
+                                                            type="number"
+                                                            placeholder={serie.weight != null ? String(serie.weight) : (lastPerformed?.weight_used != null ? String(lastPerformed.weight_used) : "0")}
+                                                            value={currentValues.weight}
+                                                            onChange={(e) => handleSerieValueChange(serie.id, routineExercise.exercise.id, 'weight', e.target.value)}
+                                                            className="w-14 h-9"
+                                                            step="0.5"
+                                                        />
+                                                        <span className="text-sm text-gray-600">kg</span>
+                                                        {/* Mostrar lastPerformed si no hay plan y no está completada */}
+                                                        {!completed && serie.weight == null && lastPerformed && (
+                                                            <div className="text-xs text-gray-500 ml-2">
+                                                                Últ: {lastPerformed.weight_used ?? "—"} kg
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Input
+                                                            type="number"
+                                                            placeholder={serie.reps != null ? String(serie.reps) : (lastPerformed?.reps_performed != null ? String(lastPerformed.reps_performed) : "0")}
+                                                            value={currentValues.reps}
+                                                            onChange={(e) => handleSerieValueChange(serie.id, routineExercise.exercise.id, 'reps', e.target.value)}
+                                                            className="w-14 h-9"
+                                                        />
+                                                        <span className="text-sm text-gray-600">reps</span>
+                                                        {!completed && serie.reps == null && lastPerformed && (
+                                                            <div className="text-xs text-gray-500 ml-2">
+                                                                Últ: {lastPerformed.reps_performed ?? "—"}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                </div>
+                                            </div>
+
+                                            {/* Notas de la serie */}
+                                            {serie.notes && (
+                                                <p className="mt-2 text-sm text-gray-600 ml-12">
+                                                    💡 {serie.notes}
+                                                </p>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Footer fijo con acciones */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
+                <div className="max-w-4xl mx-auto px-4 py-4 flex gap-3">
+                    <Button
+                        variant="outline"
+                        className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                        onClick={handleCancelSession}
+                        disabled={cancelling || finishing}
+                    >
+                        {cancelling ? "Cancelando..." : "Cancelar Sesión"}
+                    </Button>
+                    <Button
+                        className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold"
+                        onClick={handleFinishSession}
+                        disabled={finishing || cancelling}
+                    >
+                        {finishing ? "Finalizando..." : "Finalizar Sesión"}
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+}
