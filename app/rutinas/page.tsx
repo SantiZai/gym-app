@@ -6,6 +6,8 @@ import { Plus, Calendar, Clock, Users, Edit, Trash2, Play } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Routine } from "@/types/db";
 import { getUserRoutines } from "@/utils/routineUtils";
+import { Button } from "@/components/ui/button";
+import { startSession } from "@/utils/sessionUtils";
 
 export default function RutinasPage() {
   const { user } = useAuth();
@@ -154,13 +156,13 @@ export default function RutinasPage() {
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    <Link
-                      href={`/rutinas/${rutina.id}`}
-                      className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                    <Button
+                      className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200 cursor-pointer"
+                      onClick={() => startSession(rutina.id)}
                     >
                       <Play className="h-4 w-4 mr-1" />
                       Iniciar
-                    </Link>
+                    </Button>
                     <Link
                       href={`/rutinas/${rutina.id}/editar`}
                       className="inline-flex items-center justify-center px-3 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors duration-200"
