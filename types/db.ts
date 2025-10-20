@@ -80,3 +80,12 @@ export interface SessionSerie {
     updated_at: string;
     metadata: any;
 }
+
+// Extended type for routine exercises with nested data from joins
+export interface RoutineExerciseWithDetails {
+    id: string;
+    orden: number;
+    notes: string | null;
+    exercise: Exercise;
+    series: Serie[];
+}
