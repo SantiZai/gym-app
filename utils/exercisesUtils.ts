@@ -1,5 +1,18 @@
 import { createClient } from "./supabase/client"
 
+export const getExerciseById = async (id: string) => {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase.from("exercises").select("*").eq("id", id)
+
+    if (error) {
+        console.error(error)
+        return null
+    }
+
+    return data[0]
+}
+
 export const getExercises = async () => {
     const supabase = await createClient()
 
