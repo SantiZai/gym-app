@@ -14,15 +14,26 @@ import {
     Search,
     X
 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
 import { Routine, Exercise, Serie, RoutineExercise } from "@/types/db";
-import { getRoutineById, getRoutineExercises } from "@/utils/routineUtils";
+import { 
+    getRoutineById, 
+    getRoutineExercises, 
+    getSeriesByRoutineExerciseId,
+    updateRoutine,
+    createRoutineExercise,
+    updateRoutineExercise,
+    deleteRoutineExercise,
+    createSerie,
+    updateSerie,
+    deleteSerie
+} from "@/utils/routineUtils";
 import { getExercisesByIds, getExercises } from "@/utils/exercisesUtils";
 
 const TIPOS_SERIE = [
     { value: "normal", label: "Normal", color: "bg-blue-100 text-blue-800" },
     { value: "warm-up", label: "Calentamiento", color: "bg-yellow-100 text-yellow-800" },
-    { value: "cooldown", label: "Descanso", color: "bg-gray-100 text-gray-800" }
+    { value: "dropset", label: "Dropset", color: "bg-gray-100 text-gray-800" },
+    { value: "otro", label: "Otro", color: "bg-gray-100 text-gray-800" }
 ];
 
 interface MappedExercise extends Exercise {
@@ -39,13 +50,11 @@ interface RoutineComplete extends Routine {
 export default function EditarRutinaPage() {
     const params = useParams();
     const router = useRouter();
-    const { user } = useAuth();
     const rutinaId = params.id as string;
 
     const [rutina, setRutina] = useState<RoutineComplete | null>(null);
     const [loading, setLoading] = useState(true);
     const [guardando, setGuardando] = useState(false);
-    const [editandoSerie, setEditandoSerie] = useState<string | null>(null);
 
     const [routineExercises, setRoutineExercises] = useState<RoutineExercise[]>([]);
 
@@ -67,21 +76,51 @@ export default function EditarRutinaPage() {
                 const exerciseIds: string[] = routineExercises.map((re: any) => re.exercise_id);
                 const exercisesFromApi: Exercise[] = await getExercisesByIds(exerciseIds);
 
-                // Mapear ejercicios: asignar routine_exercise_id, orden, notes y series vacías
-                const exercisesMapped: MappedExercise[] = exercisesFromApi.map((ex) => {
-                    const re = routineExercises.find((r) => r.exercise_id === ex.id);
-                    return {
-                        ...ex,
-                        routine_exercise_id: re?.id ?? null,
-                        orden: re?.orden ?? null,
-                        notes: re?.notes ?? null,
-                        series: [] // inicializamos vacío: las series se crearán al editar
-                    };
+                // Mapear ejercicios: asignar routine_exercise_id, orden, notes y cargar series existentes
+                const exercisesMapped: MappedExercise[] = await Promise.all(
+                    exercisesFromApi.map(async (ex) => {
+                        const re = routineExercises.find((r) => r.exercise_id === ex.id);
+                        let series: Serie[] = [];
+                        
+                        // Cargar series existentes si tiene routine_exercise_id
+                        if (re?.id) {
+                            try {
+                                const seriesData = await getSeriesByRoutineExerciseId(re.id);
+                                // Convertir los datos de la DB al formato esperado
+                                series = seriesData.map((s: any) => ({
+                                    id: s.id,
+                                    routine_exercise_id: s.routine_exercise_id,
+                                    type: s.type,
+                                    reps: String(s.reps),
+                                    weight: String(s.weight || '0'),
+                                    orden: s.orden,
+                                    notes: s.notes
+                                }));
+                            } catch (err) {
+                                console.error(`Error cargando series para ejercicio ${ex.id}:`, err);
+                            }
+                        }
+
+                        return {
+                            ...ex,
+                            routine_exercise_id: re?.id ?? null,
+                            orden: re?.orden ?? null,
+                            notes: re?.notes ?? null,
+                            series
+                        };
+                    })
+                );
+
+                // Ordenar ejercicios por el campo orden
+                const exercisesSorted = exercisesMapped.sort((a, b) => {
+                    const ordenA = a.orden ?? 0;
+                    const ordenB = b.orden ?? 0;
+                    return ordenA - ordenB;
                 });
 
                 const completeRoutine: RoutineComplete = {
                     ...routine,
-                    exercises: exercisesMapped
+                    exercises: exercisesSorted
                 };
 
                 setRutina(completeRoutine);
@@ -273,15 +312,124 @@ export default function EditarRutinaPage() {
         });
     };
 
+    const eliminarEjercicio = (ejercicioIndex: number) => {
+        if (!rutina) return;
+        
+        if (window.confirm("¿Estás seguro de que deseas eliminar este ejercicio? Esta acción eliminará también todas sus series.")) {
+            setRutina((prev) => {
+                if (!prev) return prev;
+                const arr = [...prev.exercises];
+                arr.splice(ejercicioIndex, 1);
+                const ordered = arr.map((ex, idx) => ({ ...ex, orden: idx + 1 }));
+                return { ...prev, exercises: ordered };
+            });
+        }
+    };
+
     const guardarRutina = async () => {
+        if (!rutina) return;
+        
         setGuardando(true);
 
-        // TODO: implementar guardado real (RPC / múltiples inserts)
-        setTimeout(() => {
-            setGuardando(false);
-            alert("Rutina actualizada exitosamente!");
+        try {
+            // 1. Actualizar información básica de la rutina
+            await updateRoutine(rutinaId, {
+                name: rutina.name,
+                description: rutina.description,
+                public: rutina.public
+            });
+
+            // 2. Obtener routine_exercises existentes en DB
+            const existingRoutineExercises = routineExercises;
+            const existingRoutineExerciseIds = new Set(existingRoutineExercises.map(re => re.id));
+
+            // 3. Procesar cada ejercicio en la rutina actual
+            for (let i = 0; i < rutina.exercises.length; i++) {
+                const exercise = rutina.exercises[i];
+                let routineExerciseId = exercise.routine_exercise_id;
+
+                // Si es un ejercicio nuevo (no tiene routine_exercise_id)
+                if (!routineExerciseId) {
+                    // Crear el routine_exercise
+                    const newRoutineExercise = await createRoutineExercise(
+                        rutinaId,
+                        exercise.id,
+                        i + 1,
+                        exercise.notes
+                    );
+                    routineExerciseId = newRoutineExercise.id;
+                } else {
+                    // Actualizar routine_exercise existente (orden y notas)
+                    await updateRoutineExercise(routineExerciseId, {
+                        orden: i + 1,
+                        notes: exercise.notes
+                    });
+                    // Marcar como procesado
+                    existingRoutineExerciseIds.delete(routineExerciseId);
+                }
+
+                // 4. Procesar series de este ejercicio
+                // Obtener series existentes de DB para este routine_exercise
+                let existingSeries: any[] = [];
+                if (routineExerciseId) {
+                    try {
+                        existingSeries = await getSeriesByRoutineExerciseId(routineExerciseId);
+                    } catch (err) {
+                        console.error("Error obteniendo series existentes:", err);
+                    }
+                }
+
+                const existingSerieIds = new Set(existingSeries.map(s => s.id));
+
+                // Procesar cada serie en el estado actual
+                if (routineExerciseId) {
+                    for (let j = 0; j < exercise.series.length; j++) {
+                        const serie = exercise.series[j];
+                        
+                        // Si la serie tiene un id temporal (empieza con "temp-"), es nueva
+                        if (serie.id.startsWith('temp-')) {
+                            // Crear nueva serie
+                            await createSerie(routineExerciseId, {
+                                type: serie.type,
+                                reps: serie.reps,
+                                weight: serie.weight,
+                                orden: j + 1,
+                                notes: serie.notes
+                            });
+                        } else {
+                            // Actualizar serie existente
+                            await updateSerie(serie.id, {
+                                type: serie.type,
+                                reps: serie.reps,
+                                weight: serie.weight,
+                                orden: j + 1,
+                                notes: serie.notes
+                            });
+                            existingSerieIds.delete(serie.id);
+                        }
+                    }
+
+                    // Eliminar series que ya no están en el ejercicio
+                    for (const serieId of existingSerieIds) {
+                        await deleteSerie(serieId);
+                    }
+                }
+            }
+
+            // 5. Eliminar routine_exercises que ya no están en la rutina
+            // (esto también eliminará sus series en cascada)
+            for (const routineExerciseId of existingRoutineExerciseIds) {
+                await deleteRoutineExercise(routineExerciseId);
+            }
+
+            alert("¡Rutina actualizada exitosamente!");
             router.push("/rutinas");
-        }, 1000);
+        } catch (error) {
+            console.error("Error guardando rutina:", error);
+            alert("Error al guardar la rutina. Por favor, intenta nuevamente.");
+        } finally {
+            setGuardando(false);
+        }
     };
 
     const getTipoSerieInfo = (tipo: string) => {
@@ -369,23 +517,25 @@ export default function EditarRutinaPage() {
                 {/* Información de la rutina */}
                 <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 mb-8">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Información de la Rutina</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Nombre</label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Nombre</label>
                             <input
                                 type="text"
                                 value={rutina.name}
                                 onChange={(e) => setRutina({ ...rutina, name: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-gray-900 placeholder-gray-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-300"
+                                placeholder="Nombre de la rutina"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Descripción</label>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">Descripción</label>
                             <input
                                 type="text"
                                 value={rutina.description || ""}
                                 onChange={(e) => setRutina({ ...rutina, description: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-gray-900 placeholder-gray-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-300"
+                                placeholder="Describe tu rutina"
                             />
                         </div>
                     </div>
@@ -441,13 +591,22 @@ export default function EditarRutinaPage() {
                                             </p>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => agregarSerie(ejercicio.routine_exercise_id ?? ejercicio.id)}
-                                        className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200"
-                                    >
-                                        <Plus className="h-4 w-4 mr-1" />
-                                        Serie
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => agregarSerie(ejercicio.routine_exercise_id ?? ejercicio.id)}
+                                            className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200"
+                                        >
+                                            <Plus className="h-4 w-4 mr-1" />
+                                            Serie
+                                        </button>
+                                        <button
+                                            onClick={() => eliminarEjercicio(ejercicioIndex)}
+                                            className="inline-flex items-center px-3 py-2 bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 transition-colors duration-200"
+                                            title="Eliminar ejercicio"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -483,7 +642,7 @@ export default function EditarRutinaPage() {
                                                     <select
                                                         value={serie.type}
                                                         onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "type", e.target.value as any)}
-                                                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                                                        className="w-full px-3 py-1.5 text-xs font-medium bg-white border border-gray-200 rounded-lg shadow-sm text-gray-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-300 cursor-pointer"
                                                     >
                                                         {TIPOS_SERIE.map((tipo) => (
                                                             <option key={tipo.value} value={tipo.value}>
@@ -499,8 +658,10 @@ export default function EditarRutinaPage() {
                                                         type="number"
                                                         value={serie.weight ?? ""}
                                                         onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "weight", String(e.target.value))}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                                                        className="w-full px-3 py-1.5 text-sm font-medium bg-white border border-gray-200 rounded-lg shadow-sm text-gray-900 placeholder-gray-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-300"
                                                         placeholder="0"
+                                                        min="0"
+                                                        step="0.5"
                                                     />
                                                 </div>
 
@@ -510,8 +671,10 @@ export default function EditarRutinaPage() {
                                                         type="number"
                                                         value={serie.reps ?? ""}
                                                         onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "reps", String(e.target.value))}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                                                        className="w-full px-3 py-1.5 text-sm font-medium bg-white border border-gray-200 rounded-lg shadow-sm text-gray-900 placeholder-gray-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-300"
                                                         placeholder="0"
+                                                        min="0"
+                                                        step="1"
                                                     />
                                                 </div>
 
@@ -521,8 +684,8 @@ export default function EditarRutinaPage() {
                                                         type="text"
                                                         value={serie.notes ?? ""}
                                                         onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "notes", e.target.value)}
-                                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
-                                                        placeholder="Notas..."
+                                                        className="w-full px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg shadow-sm text-gray-900 placeholder-gray-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-300"
+                                                        placeholder="Notas de la serie..."
                                                     />
                                                 </div>
 
@@ -567,7 +730,7 @@ export default function EditarRutinaPage() {
 
                                 {/* Notas del ejercicio */}
                                 <div className="mt-4 pt-4 border-t border-gray-200">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Notas del ejercicio</label>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Notas del ejercicio</label>
                                     <textarea
                                         value={ejercicio.notes ?? ""}
                                         onChange={(e) => {
@@ -579,7 +742,7 @@ export default function EditarRutinaPage() {
                                             }
                                         }}
                                         rows={2}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-gray-900 placeholder-gray-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-300 resize-none"
                                         placeholder="Notas adicionales para este ejercicio..."
                                     />
                                 </div>
@@ -604,24 +767,24 @@ export default function EditarRutinaPage() {
                         </div>
                         <div className="p-4 flex-shrink-0">
                             <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                                 <input
                                     autoFocus
                                     type="text"
                                     value={searchText}
                                     onChange={(e) => setSearchText(e.target.value)}
                                     placeholder="Buscar ejercicios..."
-                                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-gray-900 placeholder-gray-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-300"
                                 />
                             </div>
                         </div>
                         <div className="p-4 border-b flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center w-full gap-3">
-                                <div className="w-full flex flex-col md:flex-row gap-2">
+                                <div className="w-full flex flex-col md:flex-row gap-3">
                                     <select
                                         value={filterMuscle}
                                         onChange={(e) => setFilterMuscle(e.target.value)}
-                                        className="px-3 py-2 border w-full rounded-lg"
+                                        className="px-4 py-2.5 bg-white border border-gray-200 w-full rounded-xl shadow-sm text-gray-700 font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-300 cursor-pointer"
                                     >
                                         <option value="">Todos los músculos</option>
                                         {musculos.map((m) => (
@@ -633,7 +796,7 @@ export default function EditarRutinaPage() {
                                     <select
                                         value={filterType}
                                         onChange={(e) => setFilterType(e.target.value)}
-                                        className="px-3 py-2 border w-full rounded-lg"
+                                        className="px-4 py-2.5 bg-white border border-gray-200 w-full rounded-xl shadow-sm text-gray-700 font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-300 cursor-pointer"
                                     >
                                         <option value="">Todos los tipos</option>
                                         {tipos.map((t) => (
@@ -645,7 +808,7 @@ export default function EditarRutinaPage() {
                                     <select
                                         value={filterEquipment}
                                         onChange={(e) => setFilterEquipment(e.target.value)}
-                                        className="px-3 py-2 border w-full rounded-lg"
+                                        className="px-4 py-2.5 bg-white border border-gray-200 w-full rounded-xl shadow-sm text-gray-700 font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-300 cursor-pointer"
                                     >
                                         <option value="">Todo el equipamiento</option>
                                         {equipamientos.map((eq) => (
