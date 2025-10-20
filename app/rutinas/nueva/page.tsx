@@ -4,14 +4,14 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, Search, Filter, Plus, X, Save, Dumbbell } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { Exercise, RoutineExercise } from "@/types/db";
-import { createClient } from "@/utils/supabase/client";
+import { Exercise } from "@/types/db";
 import { getExercises } from "@/utils/exercisesUtils";
 import { createRoutineBasic } from "@/utils/routineUtils";
 
-interface ExerciseWithSelected extends Exercise {
+interface ExerciseWithSelectedNotes extends Exercise {
     selected?: boolean;
     orden?: number;
+    notes?: string;
 }
 
 export default function NuevaRutinaPage() {
@@ -20,9 +20,9 @@ export default function NuevaRutinaPage() {
     const [rutinaDescripcion, setRutinaDescripcion] = useState("");
     const [rutinaPublica, setRutinaPublica] = useState(false);
 
-    const [ejercicios, setEjercicios] = useState<ExerciseWithSelected[]>([]);
-    const [ejerciciosFiltrados, setEjerciciosFiltrados] = useState<ExerciseWithSelected[]>([]);
-    const [ejerciciosSeleccionados, setEjerciciosSeleccionados] = useState<ExerciseWithSelected[]>([]);
+    const [ejercicios, setEjercicios] = useState<ExerciseWithSelectedNotes[]>([]);
+    const [ejerciciosFiltrados, setEjerciciosFiltrados] = useState<ExerciseWithSelectedNotes[]>([]);
+    const [ejerciciosSeleccionados, setEjerciciosSeleccionados] = useState<ExerciseWithSelectedNotes[]>([]);
 
     const [busqueda, setBusqueda] = useState("");
     const [filtroMusculo, setFiltroMusculo] = useState("");
@@ -32,7 +32,6 @@ export default function NuevaRutinaPage() {
     const [loading, setLoading] = useState(true);
     const [guardando, setGuardando] = useState(false);
 
-    // Datos de ejemplo para ejercicios
     useEffect(() => {
         getExercises().then(data => {
             console.log(data)
@@ -42,7 +41,6 @@ export default function NuevaRutinaPage() {
         })
     }, []);
 
-    // Filtrar ejercicios
     useEffect(() => {
         let filtrados = ejercicios.filter(ejercicio => {
             const coincideBusqueda = ejercicio.name.toLowerCase().includes(busqueda.toLowerCase());
@@ -60,7 +58,7 @@ export default function NuevaRutinaPage() {
     const tipos = [...new Set(ejercicios.map(e => e.type).filter(Boolean))];
     const equipamientos = [...new Set(ejercicios.map(e => e.equipment).filter(Boolean))];
 
-    const agregarEjercicio = (ejercicio: ExerciseWithSelected) => {
+    const agregarEjercicio = (ejercicio: ExerciseWithSelectedNotes) => {
         if (!ejerciciosSeleccionados.find(e => e.id === ejercicio.id)) {
             const ejercicioConOrden = {
                 ...ejercicio,
@@ -100,6 +98,21 @@ export default function NuevaRutinaPage() {
         setEjerciciosSeleccionados(nuevosEjercicios);
     };
 
+    const generatePayload = () => {
+        return {
+            "nombre": rutinaNombre,
+            "descripcion": rutinaDescripcion,
+            "publica": rutinaPublica,
+            "ejercicios": ejerciciosSeleccionados.map((ejercicio: ExerciseWithSelectedNotes) => {
+                return {
+                    "ejercicio_id": ejercicio.id,
+                    "orden": ejercicio.orden,
+                    "notas": ejercicio.notes || null
+                }
+            })
+        }
+    }
+
     const guardarRutina = async () => {
         if (!rutinaNombre.trim()) {
             alert("Por favor ingresa un nombre para la rutina");
@@ -113,25 +126,7 @@ export default function NuevaRutinaPage() {
 
         setGuardando(true);
 
-        // TODO: Implementar guardado en base de datos
-        const payload = {
-            "nombre": "Pecho & Tríceps - Básica",
-            "descripcion": "Rutina para fuerza",
-            "publica": false,
-            "ejercicios": [
-                {
-                    "ejercicio_id": "85da8260-59ff-41b0-9a41-e53ea5ccf45e",
-                    "orden": 1,
-                    "notas": "Primero press"
-                },
-                {
-                    "ejercicio_id": "2dff2d3c-80af-4f6e-bf05-512473614a5c",
-                    "orden": 2,
-                    "notas": "Luego fondos"
-                }
-            ]
-        }
-        createRoutineBasic(payload).then((res) => {
+        createRoutineBasic(generatePayload()).then((res) => {
             setGuardando(false)
             window.location.href = "/rutinas";
         })
