@@ -108,11 +108,11 @@ export async function getSessionData(sessionId: string) {
   };
 }
 
-// Actualizar o crear session_serie con upsert atómico.
-// El find-then-insert anterior perdía carreras entre guardados concurrentes
-// (doble tap, stepper + completar) con 409 por uq_session_series_sessionid_serieid.
-// created_at se omite a propósito: en el insert lo pone el default de la DB
-// y en el update no debe tocarse.
+// Actualizar o crear session_serie sin carreras:
+// 1) intenta update (caso común), 2) si no había fila inserta,
+// 3) si el insert choca con otro guardado concurrente (409 por la unique
+// parcial uq_session_series_sessionid_serieid) reintenta el update.
+// ON CONFLICT no sirve aquí porque la constraint es parcial.
 export async function updateOrCreateSessionSerie(
   sessionId: string,
   serieId: string | null,
@@ -126,24 +126,49 @@ export async function updateOrCreateSessionSerie(
   }
 ) {
   const supabase = await createClient();
+  const payload = {
+    session_id: sessionId,
+    serie_id: serieId,
+    exercise_id: exerciseId,
+    ...data,
+    // created_at se omite: en el insert lo pone el default de la DB
+    // y en el update no debe tocarse
+    updated_at: new Date().toISOString(),
+  };
 
-  const { data: row, error } = await supabase
+  // 1) Update primero (caso común: la fila ya existe)
+  const { data: updated, error: updateError } = await supabase
     .from("session_series")
-    .upsert(
-      {
-        session_id: sessionId,
-        serie_id: serieId,
-        exercise_id: exerciseId,
-        ...data,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "session_id,serie_id" }
-    )
-    .select()
-    .single();
+    .update(payload)
+    .eq("session_id", sessionId)
+    .eq("serie_id", serieId)
+    .select();
+  if (updateError) throw updateError;
+  if (updated.length > 0) return updated[0] as SessionSerie;
 
-  if (error) throw error;
-  return row as SessionSerie;
+  try {
+    // 2) No existía: insertar
+    const { data: created, error: createError } = await supabase
+      .from("session_series")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (createError) throw createError;
+    return created as SessionSerie;
+  } catch (e) {
+    if ((e as { code?: string })?.code !== "23505") throw e;
+    // 3) Otro guardado ganó la carrera: la fila ya existe, actualizarla
+    const { data: retried, error: retryError } = await supabase
+      .from("session_series")
+      .update(payload)
+      .eq("session_id", sessionId)
+      .eq("serie_id", serieId)
+      .select();
+    if (retryError) throw retryError;
+    if (retried.length === 0) throw e;
+    return retried[0] as SessionSerie;
+  }
 }
 
 // Marcar serie como completada
