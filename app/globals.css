@@ -230,3 +230,10 @@
 .dark .hover\:border-slate-300:hover {
   border-color: #475569;
 }
+
+/* Unificar superficies: las Card de shadcn (progreso, calendario) usan
+   --card/--popover; se igualan al mismo fondo de las cards de rutinas. */
+.dark {
+  --card: #0f172a;
+  --popover: #0f172a;
+}
