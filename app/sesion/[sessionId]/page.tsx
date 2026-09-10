@@ -643,7 +643,7 @@ export default function SessionPage() {
                                         <div
                                             key={serie.id}
                                             className={`p-4 transition-colors ${completed
-                                                ? "bg-green-50"
+                                                ? "bg-green-500/10"
                                                 : "bg-white hover:bg-slate-50"
                                                 }`}
                                         >
