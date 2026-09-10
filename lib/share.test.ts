@@ -34,7 +34,7 @@ describe("buildShareText", () => {
 
   it("omite la racha si es 0 y no hay marcas", () => {
     const text = buildShareText({ streak: null, records: [], totalSessions: 0, activeDays: 0 });
-    expect(text).toContain("🏋️ Mi progreso en GymApp");
+    expect(text).toContain("🏋️ Mi progreso en DiaUno");
     expect(text).not.toContain("🔥");
     expect(text).not.toContain("🏆");
   });

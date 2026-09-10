@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "GymApp - Tu entrenador personal",
-    short_name: "GymApp",
+    name: "DiaUno - Tu entrenador personal",
+    short_name: "DiaUno",
     description: "Gestiona tus rutinas, ejercicios y progreso en el gimnasio",
     start_url: "/",
     display: "standalone",

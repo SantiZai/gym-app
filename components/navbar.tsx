@@ -127,7 +127,7 @@ export function Navbar() {
               className="hidden md:flex items-center space-x-2"
             >
               <Dumbbell className="h-8 w-8 text-blue-600" strokeWidth={2.5} />
-              <span className="text-xl font-bold text-slate-900">GymApp</span>
+              <span className="text-xl font-bold text-slate-900">DiaUno</span>
             </Link>
 
             {/* Logo centrado - Mobile */}
@@ -136,7 +136,7 @@ export function Navbar() {
               className="flex md:hidden items-center space-x-2 absolute left-1/2 transform -translate-x-1/2"
             >
               <Dumbbell className="h-8 w-8 text-blue-600" strokeWidth={2.5} />
-              <span className="text-xl font-bold text-slate-900">GymApp</span>
+              <span className="text-xl font-bold text-slate-900">DiaUno</span>
             </Link>
 
             {/* Links y perfil - Desktop */}
@@ -261,7 +261,7 @@ export function Navbar() {
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center space-x-2 px-4">
             <Dumbbell className="h-6 w-6 text-blue-600" strokeWidth={2.5} />
-            <span className="text-lg font-bold text-slate-900">GymApp</span>
+            <span className="text-lg font-bold text-slate-900">DiaUno</span>
           </div>
           <button
             onClick={() => setIsOpen(false)}

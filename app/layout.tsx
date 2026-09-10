@@ -19,12 +19,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GymApp - Tu entrenador personal",
+  title: "DiaUno - Tu entrenador personal",
   description: "Gestiona tus rutinas, ejercicios y progreso en el gimnasio",
-  applicationName: "GymApp",
+  applicationName: "DiaUno",
   appleWebApp: {
     capable: true,
-    title: "GymApp",
+    title: "DiaUno",
     statusBarStyle: "default",
   },
   icons: {

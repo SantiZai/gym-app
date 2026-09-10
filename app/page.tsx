@@ -7,7 +7,7 @@ export default function Home() {
       <section className="max-w-5xl mx-auto px-4 py-16 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 mb-6">
-            Bienvenido a <span className="text-blue-600">GymApp</span>
+            Bienvenido a <span className="text-blue-600">DiaUno</span>
           </h1>
           <p className="text-lg sm:text-xl text-slate-600 mb-8 max-w-2xl mx-auto">
             Tu compañero perfecto para alcanzar tus objetivos. Gestiona rutinas, registra sesiones de entrenamiento y monitorea tu progreso.
@@ -72,8 +72,14 @@ export default function Home() {
       <footer className="px-4 py-12 sm:px-6 lg:px-8 bg-slate-900 text-white">
         <div className="max-w-7xl mx-auto text-center">
           <p className="text-slate-400">
-            © {new Date().getFullYear()} GymApp. Todos los derechos reservados.
+            © {new Date().getFullYear()} DiaUno. Todos los derechos reservados.
           </p>
+          <Link
+            href="/privacidad"
+            className="mt-2 inline-block text-sm text-slate-400 underline-offset-4 hover:text-slate-200 hover:underline"
+          >
+            Política de Privacidad
+          </Link>
         </div>
       </footer>
     </div>
