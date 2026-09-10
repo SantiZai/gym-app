@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ArrowLeft, Search, Plus, X, Save, Dumbbell } from "lucide-react";
 import { Exercise } from "@/types/db";
 import { getExercises } from "@/utils/exercisesUtils";
+import { normalizeMuscleGroup } from "@/lib/muscleGroups";
+import { equipmentLabel } from "@/lib/exerciseLabels";
 import { createRoutineBasic } from "@/utils/routineUtils";
 import { toast } from "sonner";
 
@@ -379,16 +381,16 @@ export default function NuevaRutinaPage() {
                                                         : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
                                                         }`}
                                                 >
-                                                    <div className="flex items-start justify-between">
-                                                        <div className="flex-1">
-                                                            <h3 className="font-medium text-slate-900 mb-1">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex-1 min-w-0">
+                                                            <h3 className="font-medium text-slate-900 mb-1 break-words">
                                                                 {ejercicio.name}
                                                             </h3>
-                                                            <div className="flex items-center space-x-4 text-sm text-slate-500 mb-2">
-                                                                <span>💪 {ejercicio.muscle}</span>
-                                                                <span>🏋️ {ejercicio.equipment}</span>
+                                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 mb-2">
+                                                                <span>💪 {normalizeMuscleGroup(ejercicio.muscle) ?? ejercicio.muscle ?? "—"}</span>
+                                                                <span>🏋️ {equipmentLabel(ejercicio.equipment) ?? "—"}</span>
                                                             </div>
-                                                            <p className="text-xs text-slate-600 line-clamp-2">
+                                                            <p className="text-xs text-slate-600 line-clamp-2 break-words">
                                                                 {ejercicio.instructions}
                                                             </p>
                                                         </div>
@@ -398,7 +400,8 @@ export default function NuevaRutinaPage() {
                                                                     ? removerEjercicio(ejercicio.id)
                                                                     : agregarEjercicio(ejercicio)
                                                             }
-                                                            className={`ml-4 p-2 rounded-lg transition-colors duration-200 ${yaSeleccionado
+                                                            aria-label={yaSeleccionado ? `Quitar ${ejercicio.name}` : `Agregar ${ejercicio.name}`}
+                                                            className={`shrink-0 p-2 rounded-lg transition-colors duration-200 ${yaSeleccionado
                                                                 ? 'bg-red-100 text-red-600 hover:bg-red-200'
                                                                 : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
                                                                 }`}

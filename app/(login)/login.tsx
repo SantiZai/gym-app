@@ -7,6 +7,7 @@ import { signInWithMagicLink } from "./actions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 export const Login = ({ mode = "signin" }: { mode?: "signin" | "signup" }) => {
@@ -28,30 +29,40 @@ export const Login = ({ mode = "signin" }: { mode?: "signin" | "signup" }) => {
     FormData
   >(signInWithMagicLink, { error: "", success: "" });
 
+  const isSignin = mode === "signin";
+
   return (
     <div className="min-h-[100dvh] bg-gradient-to-b from-white to-slate-50 flex items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
       <div className="w-full max-w-md">
-        <div className="flex justify-center">
-          <p>Logo app contable</p>
+        <div className="flex flex-col items-center">
+          <Image
+            src="/icons/icon-192.png"
+            alt="DiaUno"
+            width={56}
+            height={56}
+            className="rounded-2xl"
+            priority
+          />
+          <p className="mt-3 text-xl font-bold text-slate-900">DiaUno</p>
         </div>
 
-        <h1 className="mt-10 text-2xl font-semibold tracking-tight text-center text-slate-900">
-          {mode === "signin" ? "Welcome back" : "Create your account"}
+        <h1 className="mt-8 text-2xl font-semibold tracking-tight text-center text-slate-900">
+          {isSignin ? "Hola de nuevo" : "Creá tu cuenta"}
         </h1>
         <p className="mt-2 text-sm text-center text-slate-600">
-          {mode === "signin"
-            ? "Sign in to continue to your account"
-            : "Get started with your new account"}
+          {isSignin
+            ? "Entrá para seguir entrenando"
+            : "Empezá a registrar tu progreso hoy"}
         </p>
 
         <div className="mt-10">
           {magicLinkState?.success ? (
             <div className="p-6 text-center bg-green-50 rounded-lg">
               <h3 className="text-sm font-medium text-green-800">
-                Check your email
+                Revisá tu email
               </h3>
               <p className="mt-2 text-sm text-green-700">
-                We&apos;ve sent you a magic link to sign in to your account.
+                Te enviamos un enlace para entrar a tu cuenta.
               </p>
             </div>
           ) : (
@@ -60,7 +71,7 @@ export const Login = ({ mode = "signin" }: { mode?: "signin" | "signup" }) => {
                 <Input
                   name="email"
                   type="email"
-                  placeholder="name@example.com"
+                  placeholder="tu@email.com"
                   required
                   className="px-4 h-12 bg-white rounded-lg border-slate-200 shadow-sm transition-colors focus:border-blue-500 focus:ring-blue-500"
                 />
@@ -72,7 +83,7 @@ export const Login = ({ mode = "signin" }: { mode?: "signin" | "signup" }) => {
                   {pending ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
-                    "Continue with Email"
+                    "Continuar con email"
                   )}
                 </Button>
               </form>
@@ -83,7 +94,7 @@ export const Login = ({ mode = "signin" }: { mode?: "signin" | "signup" }) => {
                 </div>
                 <div className="flex relative justify-center">
                   <span className="px-4 text-sm text-slate-500 bg-gradient-to-b from-white to-slate-50">
-                    or
+                    o
                   </span>
                 </div>
               </div>
@@ -114,7 +125,7 @@ export const Login = ({ mode = "signin" }: { mode?: "signin" | "signup" }) => {
                         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                       />
                     </svg>
-                    Continue with Google
+                    Continuar con Google
                   </div>
                 )}
               </Button>
@@ -128,14 +139,19 @@ export const Login = ({ mode = "signin" }: { mode?: "signin" | "signup" }) => {
           )}
 
           <p className="mt-8 text-sm text-center text-slate-600">
-            {mode === "signin"
-              ? "New to our platform? "
-              : "Already have an account? "}
+            {isSignin ? "¿Primera vez acá? " : "¿Ya tenés cuenta? "}
             <Link
-              href={`${mode === "signin" ? "/register" : "/login"}`}
+              href={`${isSignin ? "/register" : "/login"}`}
               className="font-medium text-blue-600 hover:text-blue-500"
             >
-              {mode === "signin" ? "Create an account" : "Sign in"}
+              {isSignin ? "Creá una cuenta" : "Iniciá sesión"}
+            </Link>
+          </p>
+
+          <p className="mt-4 text-center text-xs text-slate-500">
+            Al continuar aceptás nuestra{" "}
+            <Link href="/privacidad" className="underline underline-offset-2 hover:text-slate-700">
+              Política de Privacidad
             </Link>
           </p>
         </div>

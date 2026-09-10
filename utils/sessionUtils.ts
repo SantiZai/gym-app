@@ -247,7 +247,9 @@ export function formatSessionDuration(
   }
 
   if (startedAt && endedAt) {
-    const ms = new Date(endedAt).getTime() - new Date(startedAt).getTime();
+    // La DB guarda ended_at naive en UTC: sin designador se asume Z
+    const asUtc = (iso: string) => (/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
+    const ms = new Date(asUtc(endedAt)).getTime() - new Date(asUtc(startedAt)).getTime();
     if (Number.isFinite(ms)) return toLabel(ms / 60000);
   }
   return "—";

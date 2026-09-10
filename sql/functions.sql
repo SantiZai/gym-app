@@ -9,6 +9,8 @@
 -- Estado:
 -- - start_session, create_routine_basic y
 --   get_last_performed_by_exercises_by_last_planned_series: en uso por la app.
+-- - finish_session: en uso; incluye fix 42702 de
+--   sql/migrations/fix_finish_session_ambiguous.sql (aplicar en DB).
 -- - finish_session, record_or_update_series y get_last_performed_by_exercises:
 --   existen en la DB pero la app hoy NO las usa (finish/record se hacen
 --   por cliente en utils/sessionUtils.ts).
@@ -74,13 +76,14 @@ $function$
 ;
 
 CREATE OR REPLACE FUNCTION public.finish_session(p_session_id uuid, p_end_at timestamp with time zone DEFAULT now())
- RETURNS TABLE(session_id uuid, user_id uuid, routine_id uuid, started_at timestamp with time zone, ended_at timestamp with time zone, duration interval, total_series_completed integer, total_volume numeric)
+ RETURNS TABLE(session_id uuid, user_id uuid, routine_id uuid, started_at timestamp with time zone, ended_at timestamp, duration interval, total_series_completed bigint, total_volume numeric)
  LANGUAGE plpgsql
  SECURITY DEFINER
 AS $function$
 declare
   v_user uuid;
   v_started timestamp with time zone;
+  v_date timestamp with time zone;
 begin
   v_user := auth.uid()::uuid;
 
@@ -89,16 +92,16 @@ begin
     raise exception 'Sesión no encontrada o no pertenece al usuario';
   end if;
 
-  -- Obtener started_at si existe
-  select started_at into v_started from public.sessions where id = p_session_id;
+  -- Fechas en variables (evita ambigüedad con los OUT params - fix 42702)
+  select s.started_at, s.date into v_started, v_date
+  from public.sessions s where s.id = p_session_id;
 
   -- Actualizar sesión: ended_at, duration y status
   update public.sessions set
     ended_at = p_end_at,
-    duration = p_end_at - coalesce(started_at, date),
-    status = 'finished',
-    notes = coalesce(notes, notes)
-  where id = p_session_id;
+    duration = p_end_at - coalesce(v_started, v_date),
+    status = 'finished'
+  where public.sessions.id = p_session_id;
 
   -- Devolver resumen agregado
   return query

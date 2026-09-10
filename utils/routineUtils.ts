@@ -48,13 +48,24 @@ export async function getRoutineExercises(routineId: string) {
     return data;
 }
 
+export function extractRutinaId(data: unknown): string {
+    // PostgREST puede devolver la fila como array o como objeto único
+    const rows = Array.isArray(data) ? data : data ? [data] : [];
+    const id = (rows[0] as { rutina_id?: unknown } | undefined)?.rutina_id;
+    if (typeof id !== "string" || id.length === 0) {
+        console.error("create_routine_basic sin rutina_id en la respuesta:", data);
+        throw new Error("La rutina no devolvió identificador");
+    }
+    return id;
+}
+
 export async function createRoutineBasic(payload: CreateRoutinePayload) {
     const supabase = await createClient()
     const { data, error } = await supabase
         .rpc('create_routine_basic', { p_payload: payload });
 
     if (error) throw error;
-    return data?.[0]?.rutina_id as string;
+    return extractRutinaId(data);
 }
 
 // Obtener series de un routine_exercise

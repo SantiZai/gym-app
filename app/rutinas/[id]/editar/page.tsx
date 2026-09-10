@@ -9,7 +9,7 @@ import {
     Trash2,
     ChevronUp,
     ChevronDown,
-    RotateCcw,
+    Copy,
     Search,
     X
 } from "lucide-react";
@@ -27,6 +27,9 @@ import {
     deleteSerie
 } from "@/utils/routineUtils";
 import { getExercisesByIds, getExercises } from "@/utils/exercisesUtils";
+import { SwipeableRow } from "@/components/shared/SwipeableRow";
+import { normalizeMuscleGroup } from "@/lib/muscleGroups";
+import { equipmentLabel } from "@/lib/exerciseLabels";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { toast } from "sonner";
 
@@ -609,117 +612,122 @@ export default function EditarRutinaPage() {
                             </div>
 
                             {/* Series */}
-                            <div className="p-6">
-                                <div className="space-y-3">
-                                    {/* Header de la tabla */}
-                                    <div className="grid grid-cols-12 gap-3 text-sm font-medium text-slate-700 pb-2 border-b border-slate-200">
-                                        <div className="col-span-1">#</div>
-                                        <div className="col-span-2">Tipo</div>
-                                        <div className="col-span-2">Peso (kg)</div>
-                                        <div className="col-span-2">Reps</div>
-                                        <div className="col-span-3">Notas</div>
-                                        <div className="col-span-2">Acciones</div>
-                                    </div>
-
-                                    {/* Filas de series (ahora por ejercicio: ejercicio.series) */}
+                            <div className="p-4 sm:p-6">
+                                <div className="space-y-2">
+                                    {/* Filas de series (deslizar en mobile para duplicar/eliminar) */}
                                     {ejercicio.series.map((serie, serieIndex) => {
                                         return (
-                                            <div
+                                            <SwipeableRow
                                                 key={serie.id}
-                                                className="grid grid-cols-12 gap-3 items-center py-2 hover:bg-slate-50 rounded-lg"
+                                                actionsWidth={96}
+                                                actions={
+                                                    <>
+                                                        <button
+                                                            onClick={() => duplicarSerie(ejercicio.id, serie.id)}
+                                                            aria-label="Duplicar serie"
+                                                            className="flex h-full w-12 items-center justify-center bg-blue-600 text-white"
+                                                        >
+                                                            <Copy className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => eliminarSerie(ejercicio.id, serie.id)}
+                                                            disabled={ejercicio.series.length <= 1}
+                                                            aria-label="Eliminar serie"
+                                                            className="flex h-full w-12 items-center justify-center bg-red-600 text-white disabled:opacity-40"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </>
+                                                }
                                             >
+                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-white px-2 py-2 hover:bg-slate-50 dark:bg-slate-900">
                                                 {/* Número de serie */}
-                                                <div className="col-span-1 text-sm font-medium text-slate-900">
+                                                <span className="w-5 text-center text-sm font-medium text-slate-900">
                                                     {serieIndex + 1}
-                                                </div>
+                                                </span>
 
                                                 {/* Tipo de serie */}
-                                                <div className="col-span-2">
-                                                    <select
-                                                        value={serie.type}
-                                                        onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "type", e.target.value)}
-                                                        className="w-full px-3 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg shadow-sm text-slate-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300 cursor-pointer"
-                                                    >
-                                                        {TIPOS_SERIE.map((tipo) => (
-                                                            <option key={tipo.value} value={tipo.value}>
-                                                                {tipo.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </div>
+                                                <select
+                                                    value={serie.type}
+                                                    onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "type", e.target.value)}
+                                                    aria-label={`Tipo serie ${serieIndex + 1}`}
+                                                    className="w-28 px-2 py-2 text-xs font-medium bg-white border border-slate-200 rounded-lg shadow-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+                                                >
+                                                    {TIPOS_SERIE.map((tipo) => (
+                                                        <option key={tipo.value} value={tipo.value}>
+                                                            {tipo.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
 
                                                 {/* Peso */}
-                                                <div className="col-span-2">
+                                                <div className="flex items-center gap-1">
                                                     <input
                                                         type="number"
+                                                        inputMode="decimal"
                                                         value={serie.weight ?? ""}
                                                         onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "weight", String(e.target.value))}
-                                                        className="w-full px-3 py-1.5 text-sm font-medium bg-white border border-slate-200 rounded-lg shadow-sm text-slate-900 placeholder-slate-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300"
+                                                        aria-label={`Peso serie ${serieIndex + 1}`}
+                                                        className="w-20 px-2 py-2 text-sm font-medium bg-white border border-slate-200 rounded-lg shadow-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                         placeholder="0"
                                                         min="0"
                                                         step="0.5"
                                                     />
+                                                    <span className="text-xs text-slate-500">kg</span>
                                                 </div>
 
                                                 {/* Repeticiones */}
-                                                <div className="col-span-2">
+                                                <div className="flex items-center gap-1">
                                                     <input
                                                         type="number"
+                                                        inputMode="numeric"
                                                         value={serie.reps ?? ""}
                                                         onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "reps", String(e.target.value))}
-                                                        className="w-full px-3 py-1.5 text-sm font-medium bg-white border border-slate-200 rounded-lg shadow-sm text-slate-900 placeholder-slate-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300"
+                                                        aria-label={`Reps serie ${serieIndex + 1}`}
+                                                        className="w-16 px-2 py-2 text-sm font-medium bg-white border border-slate-200 rounded-lg shadow-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                         placeholder="0"
                                                         min="0"
                                                         step="1"
                                                     />
+                                                    <span className="text-xs text-slate-500">reps</span>
                                                 </div>
 
-                                                {/* Notas */}
-                                                <div className="col-span-3">
-                                                    <input
-                                                        type="text"
-                                                        value={serie.notes ?? ""}
-                                                        onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "notes", e.target.value)}
-                                                        className="w-full px-3 py-1.5 text-sm bg-white border border-slate-200 rounded-lg shadow-sm text-slate-900 placeholder-slate-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300"
-                                                        placeholder="Notas de la serie..."
-                                                    />
-                                                </div>
-
-                                                {/* Acciones */}
-                                                <div className="col-span-2 flex items-center space-x-1">
+                                                {/* Acciones (desktop) */}
+                                                <div className="ml-auto hidden items-center gap-0.5 sm:flex">
                                                     <button
                                                         onClick={() => moverSerie(ejercicio.id, serieIndex, "up")}
                                                         disabled={serieIndex === 0}
-                                                        className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                                                        className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
                                                         title="Mover arriba"
                                                     >
-                                                        <ChevronUp className="h-3 w-3" />
+                                                        <ChevronUp className="h-4 w-4" />
                                                     </button>
                                                     <button
                                                         onClick={() => moverSerie(ejercicio.id, serieIndex, "down")}
                                                         disabled={serieIndex === ejercicio.series.length - 1}
-                                                        className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                                                        className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
                                                         title="Mover abajo"
                                                     >
-                                                        <ChevronDown className="h-3 w-3" />
+                                                        <ChevronDown className="h-4 w-4" />
                                                     </button>
                                                     <button
                                                         onClick={() => duplicarSerie(ejercicio.id, serie.id)}
-                                                        className="p-1 text-blue-400 hover:text-blue-600"
+                                                        className="p-2 text-blue-500 hover:text-blue-700"
                                                         title="Duplicar serie"
                                                     >
-                                                        <RotateCcw className="h-3 w-3" />
+                                                        <Copy className="h-4 w-4" />
                                                     </button>
                                                     <button
                                                         onClick={() => eliminarSerie(ejercicio.id, serie.id)}
                                                         disabled={ejercicio.series.length <= 1}
-                                                        className="p-1 text-red-400 hover:text-red-600 disabled:opacity-30"
+                                                        className="p-2 text-red-500 hover:text-red-700 disabled:opacity-30"
                                                         title="Eliminar serie"
                                                     >
-                                                        <Trash2 className="h-3 w-3" />
+                                                        <Trash2 className="h-4 w-4" />
                                                     </button>
                                                 </div>
                                             </div>
+                                            </SwipeableRow>
                                         );
                                     })}
                                 </div>
@@ -831,10 +839,10 @@ export default function EditarRutinaPage() {
                                                 key={ej.id}
                                                 className={`p-3 border rounded-lg flex items-start justify-between ${ya ? "bg-blue-50 border-blue-200" : "border-slate-200"}`}
                                             >
-                                                <div className="flex-1 pr-3">
-                                                    <h4 className="font-medium text-slate-900">{ej.name}</h4>
-                                                    <div className="text-xs text-slate-500 mt-1">{ej.muscle} • {ej.equipment}</div>
-                                                    <p className="text-xs text-slate-600 mt-2 line-clamp-2">{ej.instructions}</p>
+                                                <div className="flex-1 min-w-0 pr-3">
+                                                    <h4 className="font-medium text-slate-900 break-words">{ej.name}</h4>
+                                                    <div className="text-xs text-slate-500 mt-1">{normalizeMuscleGroup(ej.muscle) ?? ej.muscle ?? "—"} • {equipmentLabel(ej.equipment) ?? "—"}</div>
+                                                    <p className="text-xs text-slate-600 mt-2 line-clamp-2 break-words">{ej.instructions}</p>
                                                 </div>
                                                 <div>
                                                     <button

@@ -18,6 +18,11 @@ describe("formatSessionDuration", () => {
     expect(formatSessionDuration(null, "2026-09-10T10:00:00", "2026-09-10T11:05:00")).toBe("1 h 05 min");
   });
 
+  it("lee ended_at naive como UTC", () => {
+    // "2026-09-10 13:20:00" sin offset = UTC (como lo guarda Postgres)
+    expect(formatSessionDuration(null, "2026-09-10T13:00:00Z", "2026-09-10 13:20:00")).toBe("20 min");
+  });
+
   it("devuelve — sin datos válidos", () => {
     expect(formatSessionDuration(null, null, null)).toBe("—");
     expect(formatSessionDuration("nope", null, null)).toBe("—");

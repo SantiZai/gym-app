@@ -587,29 +587,29 @@ export default function SessionPage() {
                         >
                             {/* Header del ejercicio */}
                             <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4 border-b">
-                                <div className="flex items-start justify-between">
-                                    <div className="flex-1">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-3">
                                             <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-sm">
                                                 {idx + 1}
                                             </span>
-                                            <div>
-                                                <h3 className="text-lg font-bold text-slate-900">
+                                            <div className="min-w-0">
+                                                <h3 className="text-lg font-bold text-slate-900 break-words">
                                                     {routineExercise.exercise.name}
                                                 </h3>
-                                                <div className="flex items-center gap-3 mt-1 text-sm text-slate-600">
+                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-slate-600">
                                                     {routineExercise.exercise.muscle && (
                                                         <span className="flex items-center gap-1">
-                                                            <Dumbbell className="h-4 w-4" />
+                                                            <Dumbbell className="h-4 w-4 shrink-0" />
                                                             {routineExercise.exercise.muscle}
                                                         </span>
                                                     )}
                                                     {routineExercise.exercise.equipment && (
-                                                        <span>• {routineExercise.exercise.equipment}</span>
+                                                        <span className="truncate">• {routineExercise.exercise.equipment}</span>
                                                     )}
                                                     {/* mostrar última vez en header si existe */}
                                                     {lastPerformed && (
-                                                        <span className="text-xs text-slate-500 ml-3">
+                                                        <span className="w-full text-xs text-slate-500 sm:w-auto sm:ml-3 sm:mt-0">
                                                             Última: {lastPerformed.weight_used ?? "0"} kg × {lastPerformed.reps_performed ?? "0"} ({lastPerformed.completed_at ? new Date(lastPerformed.completed_at).toLocaleDateString() : "—"})
                                                         </span>
                                                     )}
@@ -617,7 +617,7 @@ export default function SessionPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="text-right shrink-0">
                                         <span className="text-sm font-semibold text-slate-900">
                                             {exerciseCompletedSeries} / {totalExerciseSeries}
                                         </span>
