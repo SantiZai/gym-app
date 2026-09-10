@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { ChartCard } from "@/components/shared/ChartCard";
+import { MinimalTooltip } from "@/components/progreso/ChartTooltip";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ExerciseHistoryPoint, ExerciseMetricKey, TrainedExercise } from "@/types/progress";
@@ -142,17 +143,43 @@ export function ExerciseProgress({
           description="Registra al menos 2 sesiones de este ejercicio para ver la tendencia."
         />
       ) : (
-        <div className="h-[280px] w-full">
+        <div className="h-[260px] w-full sm:h-[280px]">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 8, left: -12 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#64748b" }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: "#64748b" }} tickLine={false} axisLine={false} width={56} />
-              <Tooltip
-                labelFormatter={(_, payload) => String(payload?.[0]?.payload?.fullDate ?? "")}
-                formatter={(value) => [`${value} ${metricUnit(metric)}`, "Valor"]}
+            <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 8, left: -8 }}>
+              <CartesianGrid vertical={false} stroke="#94a3b8" strokeOpacity={0.25} />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 12, fill: "#94a3b8" }}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                minTickGap={24}
               />
-              <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3 }} connectNulls />
+              <YAxis
+                tick={{ fontSize: 12, fill: "#94a3b8" }}
+                tickLine={false}
+                axisLine={false}
+                width={48}
+                domain={["auto", "auto"]}
+              />
+              <Tooltip
+                content={
+                  <MinimalTooltip
+                    getTitle={(item) => String(item.payload?.fullDate ?? "")}
+                    format={(value) => [`${value} ${metricUnit(metric)}`, ""]}
+                  />
+                }
+                cursor={{ stroke: "#94a3b8", strokeOpacity: 0.4 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="#2563eb"
+                strokeWidth={3}
+                dot={{ r: 5, fill: "#2563eb", stroke: "#fff", strokeWidth: 2 }}
+                activeDot={{ r: 7, strokeWidth: 0 }}
+                connectNulls
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>

@@ -6,6 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Dumbbell } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { forkRoutine, getPublicRoutineDetail, type PublicRoutineDetail } from "@/utils/communityUtils";
+import { normalizeMuscleGroup } from "@/lib/muscleGroups";
+import { equipmentLabel } from "@/lib/exerciseLabels";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -151,7 +153,7 @@ export default function ComunidadDetallePage() {
                 <div className="min-w-0">
                   <h2 className="truncate text-base font-semibold text-slate-900">{item.exercise.name}</h2>
                   <p className="truncate text-xs text-slate-500">
-                    {[item.exercise.muscle, item.exercise.equipment].filter(Boolean).join(" · ") || "—"}
+                    {[normalizeMuscleGroup(item.exercise.muscle) ?? item.exercise.muscle, equipmentLabel(item.exercise.equipment) ?? item.exercise.equipment].filter(Boolean).join(" · ") || "—"}
                   </p>
                 </div>
               </div>

@@ -10,13 +10,32 @@ interface SwipeableRowProps {
   actionsWidth?: number;
   children: ReactNode;
   className?: string;
+  /** Controlado: si se pasa, el padre maneja el estado abierto */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Ej: doble click en PC para revelar acciones sin touch */
+  onDoubleClick?: () => void;
 }
 
 /** Fila deslizable (touch): swipe a la izquierda revela acciones. */
-export function SwipeableRow({ actions, actionsWidth = 96, children, className }: SwipeableRowProps) {
+export function SwipeableRow({
+  actions,
+  actionsWidth = 96,
+  children,
+  className,
+  open: controlledOpen,
+  onOpenChange,
+  onDoubleClick,
+}: SwipeableRowProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [dx, setDx] = useState(0);
-  const [open, setOpen] = useState(false);
   const startX = useRef<number | null>(null);
+
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (value: boolean) => {
+    if (controlledOpen === undefined) setInternalOpen(value);
+    onOpenChange?.(value);
+  };
 
   const onTouchStart = (e: TouchEvent) => {
     startX.current = e.touches[0].clientX;
@@ -43,6 +62,7 @@ export function SwipeableRow({ actions, actionsWidth = 96, children, className }
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      onDoubleClick={onDoubleClick}
     >
       <div
         className="absolute inset-y-0 right-0 flex"

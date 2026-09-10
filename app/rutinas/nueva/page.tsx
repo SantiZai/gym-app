@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Search, Plus, X, Save, Dumbbell } from "lucide-react";
+import { ArrowLeft, Search, Plus, X, Save, Dumbbell, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
 import { Exercise } from "@/types/db";
 import { getExercises } from "@/utils/exercisesUtils";
-import { normalizeMuscleGroup } from "@/lib/muscleGroups";
+import { normalizeMuscleGroup, type MuscleGroup } from "@/lib/muscleGroups";
 import { equipmentLabel } from "@/lib/exerciseLabels";
+import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import { createRoutineBasic } from "@/utils/routineUtils";
 import { toast } from "sonner";
 
@@ -32,6 +33,7 @@ export default function NuevaRutinaPage() {
 
     const [loading, setLoading] = useState(true);
     const [guardando, setGuardando] = useState(false);
+    const [openActionsId, setOpenActionsId] = useState<string | null>(null);
 
     useEffect(() => {
         getExercises().then(data => {
@@ -44,7 +46,7 @@ export default function NuevaRutinaPage() {
     useEffect(() => {
         const filtrados = ejercicios.filter(ejercicio => {
             const coincideBusqueda = ejercicio.name.toLowerCase().includes(busqueda.toLowerCase());
-            const coincideMusculo = !filtroMusculo || ejercicio.muscle === filtroMusculo;
+            const coincideMusculo = !filtroMusculo || normalizeMuscleGroup(ejercicio.muscle) === filtroMusculo;
             const coincideTipo = !filtroTipo || ejercicio.type === filtroTipo;
             const coincideEquipamiento = !filtroEquipamiento || ejercicio.equipment === filtroEquipamiento;
 
@@ -54,7 +56,7 @@ export default function NuevaRutinaPage() {
         setEjerciciosFiltrados(filtrados);
     }, [ejercicios, busqueda, filtroMusculo, filtroTipo, filtroEquipamiento]);
 
-    const musculos = [...new Set(ejercicios.map(e => e.muscle).filter((v): v is string => !!v))];
+    const musculos = [...new Set(ejercicios.map(e => normalizeMuscleGroup(e.muscle)).filter((v): v is MuscleGroup => !!v))];
     const tipos = [...new Set(ejercicios.map(e => e.type).filter((v): v is string => !!v))];
     const equipamientos = [...new Set(ejercicios.map(e => e.equipment).filter((v): v is string => !!v))];
 
@@ -251,41 +253,49 @@ export default function NuevaRutinaPage() {
                                 ) : (
                                     <div className="space-y-2 max-h-64 overflow-y-auto">
                                         {ejerciciosSeleccionados.map((ejercicio, index) => (
-                                            <div
+                                            <SwipeableRow
                                                 key={ejercicio.id}
-                                                className="flex items-center justify-between p-2 bg-slate-50 rounded-lg"
+                                                open={openActionsId === ejercicio.id}
+                                                onOpenChange={(isOpen) => setOpenActionsId(isOpen ? ejercicio.id : null)}
+                                                onDoubleClick={() => setOpenActionsId((prev) => (prev === ejercicio.id ? null : ejercicio.id))}
+                                                actionsWidth={144}
+                                                actions={
+                                                    <>
+                                                        <button
+                                                            onClick={() => moverEjercicio(index, 'up')}
+                                                            disabled={index === 0}
+                                                            aria-label="Subir ejercicio"
+                                                            className="flex h-full w-12 items-center justify-center bg-slate-200 text-slate-700 disabled:opacity-40"
+                                                        >
+                                                            <ChevronUp className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => moverEjercicio(index, 'down')}
+                                                            disabled={index === ejerciciosSeleccionados.length - 1}
+                                                            aria-label="Bajar ejercicio"
+                                                            className="flex h-full w-12 items-center justify-center bg-slate-200 text-slate-700 disabled:opacity-40"
+                                                        >
+                                                            <ChevronDown className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => removerEjercicio(ejercicio.id)}
+                                                            aria-label={`Eliminar ${ejercicio.name}`}
+                                                            className="flex h-full w-12 items-center justify-center bg-red-600 text-white"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </>
+                                                }
                                             >
-                                                <div className="flex items-center flex-1">
-                                                    <span className="text-xs font-medium text-slate-500 mr-2">
+                                                <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-2">
+                                                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
                                                         {ejercicio.orden}
                                                     </span>
-                                                    <span className="text-sm font-medium text-slate-900 truncate">
+                                                    <span className="truncate text-sm font-medium text-slate-900" title={ejercicio.name}>
                                                         {ejercicio.name}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center space-x-1">
-                                                    <button
-                                                        onClick={() => moverEjercicio(index, 'up')}
-                                                        disabled={index === 0}
-                                                        className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
-                                                    >
-                                                        ↑
-                                                    </button>
-                                                    <button
-                                                        onClick={() => moverEjercicio(index, 'down')}
-                                                        disabled={index === ejerciciosSeleccionados.length - 1}
-                                                        className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
-                                                    >
-                                                        ↓
-                                                    </button>
-                                                    <button
-                                                        onClick={() => removerEjercicio(ejercicio.id)}
-                                                        className="p-1 text-red-400 hover:text-red-600"
-                                                    >
-                                                        <X className="h-3 w-3" />
-                                                    </button>
-                                                </div>
-                                            </div>
+                                            </SwipeableRow>
                                         ))}
                                     </div>
                                 )}
@@ -381,19 +391,13 @@ export default function NuevaRutinaPage() {
                                                         : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
                                                         }`}
                                                 >
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="flex-1 min-w-0">
-                                                            <h3 className="font-medium text-slate-900 mb-1 break-words">
-                                                                {ejercicio.name}
-                                                            </h3>
-                                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 mb-2">
-                                                                <span>💪 {normalizeMuscleGroup(ejercicio.muscle) ?? ejercicio.muscle ?? "—"}</span>
-                                                                <span>🏋️ {equipmentLabel(ejercicio.equipment) ?? "—"}</span>
-                                                            </div>
-                                                            <p className="text-xs text-slate-600 line-clamp-2 break-words">
-                                                                {ejercicio.instructions}
-                                                            </p>
-                                                        </div>
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <h3 className="flex-1 min-w-0 font-medium text-slate-900 break-words">
+                                                            {ejercicio.name}{" "}
+                                                            <span className="font-normal text-slate-500">
+                                                                - {equipmentLabel(ejercicio.equipment) ?? "—"}
+                                                            </span>
+                                                        </h3>
                                                         <button
                                                             onClick={() =>
                                                                 yaSeleccionado

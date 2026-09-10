@@ -29,7 +29,7 @@ import {
 import { getExercisesByIds, getExercises } from "@/utils/exercisesUtils";
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import { StepperInput } from "@/components/shared/StepperInput";
-import { normalizeMuscleGroup } from "@/lib/muscleGroups";
+import { normalizeMuscleGroup, type MuscleGroup } from "@/lib/muscleGroups";
 import { equipmentLabel } from "@/lib/exerciseLabels";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { toast } from "sonner";
@@ -168,7 +168,7 @@ export default function EditarRutinaPage() {
                 e.name.toLowerCase().includes(lower) ||
                 (e.muscle ?? "").toLowerCase().includes(lower) ||
                 (e.instructions ?? "").toLowerCase().includes(lower);
-            const matchesMuscle = !filterMuscle || e.muscle === filterMuscle;
+            const matchesMuscle = !filterMuscle || normalizeMuscleGroup(e.muscle) === filterMuscle;
             const matchesType = !filterType || e.type === filterType;
             const matchesEquipment = !filterEquipment || e.equipment === filterEquipment;
             return matchesSearch && matchesMuscle && matchesType && matchesEquipment;
@@ -176,7 +176,7 @@ export default function EditarRutinaPage() {
         setFilteredExercises(filtered);
     }, [allExercises, searchText, filterMuscle, filterType, filterEquipment]);
 
-    const musculos = useMemo(() => [...new Set(allExercises.map((e) => e.muscle).filter((v): v is string => !!v))], [allExercises]);
+    const musculos = useMemo(() => [...new Set(allExercises.map((e) => normalizeMuscleGroup(e.muscle)).filter((v): v is MuscleGroup => !!v))], [allExercises]);
     const tipos = useMemo(() => [...new Set(allExercises.map((e) => e.type).filter((v): v is string => !!v))], [allExercises]);
     const equipamientos = useMemo(() => [...new Set(allExercises.map((e) => e.equipment).filter((v): v is string => !!v))], [allExercises]);
 

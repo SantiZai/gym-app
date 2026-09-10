@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { ChartCard } from "@/components/shared/ChartCard";
+import { MinimalTooltip } from "@/components/progreso/ChartTooltip";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { VolumePoint } from "@/types/progress";
@@ -59,7 +60,7 @@ export function VolumeChart({ data, loading }: { data: VolumePoint[]; loading: b
       title="Volumen en el tiempo"
       description={`${compact.format(total)} kg movidos en el período`}
     >
-      <div className="h-[280px] w-full">
+      <div className="h-[260px] w-full sm:h-[280px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 8, right: 12, bottom: 8, left: 0 }}>
             <defs>
@@ -68,22 +69,43 @@ export function VolumeChart({ data, loading }: { data: VolumePoint[]; loading: b
                 <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="date" tick={{ fontSize: 12, fill: "#64748b" }} tickLine={false} axisLine={false} />
-            <YAxis
-              tick={{ fontSize: 12, fill: "#64748b" }}
+            <CartesianGrid vertical={false} stroke="#94a3b8" strokeOpacity={0.25} />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 12, fill: "#94a3b8" }}
               tickLine={false}
               axisLine={false}
-              width={52}
+              tickMargin={8}
+              minTickGap={24}
+            />
+            <YAxis
+              tick={{ fontSize: 12, fill: "#94a3b8" }}
+              tickLine={false}
+              axisLine={false}
+              width={48}
               tickFormatter={(v: number) => compact.format(v)}
             />
             <Tooltip
-              labelFormatter={(_, payload) => String(payload?.[0]?.payload?.fullDate ?? "")}
-              formatter={(value, name) =>
-                name === "volume" ? [`${Number(value).toLocaleString("es-ES")} kg`, "Volumen"] : [value, name]
+              content={
+                <MinimalTooltip
+                  getTitle={(item) => String(item.payload?.fullDate ?? "")}
+                  format={(value, _name, item) => [
+                    `${Number(value).toLocaleString("es-ES")} kg`,
+                    `${Number(item.payload?.sessions ?? 0)} ses.`,
+                  ]}
+                />
               }
+              cursor={{ stroke: "#94a3b8", strokeOpacity: 0.4 }}
             />
-            <Area type="monotone" dataKey="volume" stroke="#10b981" strokeWidth={2.5} fill="url(#volGradient)" />
+            <Area
+              type="monotone"
+              dataKey="volume"
+              stroke="#10b981"
+              strokeWidth={3}
+              fill="url(#volGradient)"
+              dot={false}
+              activeDot={{ r: 6, strokeWidth: 0 }}
+            />
           </AreaChart>
         </ResponsiveContainer>
       </div>

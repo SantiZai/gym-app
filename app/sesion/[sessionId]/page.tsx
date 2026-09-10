@@ -14,6 +14,8 @@ import {
     updateOrCreateSessionSerie,
 } from "@/utils/sessionUtils";
 import { updateSerie } from "@/utils/routineUtils";
+import { normalizeMuscleGroup } from "@/lib/muscleGroups";
+import { equipmentLabel } from "@/lib/exerciseLabels";
 import { estimate1RM, getPersonalRecords } from "@/utils/progressUtils";
 import type { RoutineExerciseWithDetails, Serie, Session, SessionSerie } from "@/types/db";
 import type { SessionSummary } from "@/types/progress";
@@ -623,11 +625,11 @@ export default function SessionPage() {
                                                     {routineExercise.exercise.muscle && (
                                                         <span className="flex items-center gap-1">
                                                             <Dumbbell className="h-4 w-4 shrink-0" />
-                                                            {routineExercise.exercise.muscle}
+                                                            {normalizeMuscleGroup(routineExercise.exercise.muscle) ?? routineExercise.exercise.muscle}
                                                         </span>
                                                     )}
                                                     {routineExercise.exercise.equipment && (
-                                                        <span className="truncate">• {routineExercise.exercise.equipment}</span>
+                                                        <span className="truncate">• {equipmentLabel(routineExercise.exercise.equipment) ?? routineExercise.exercise.equipment}</span>
                                                     )}
                                                     {/* mostrar última vez en header si existe */}
                                                     {lastPerformed && (
