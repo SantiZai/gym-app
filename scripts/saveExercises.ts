@@ -81,8 +81,17 @@ const muscles = [
     "triceps"
 ]
 
-function formatExercises(exercises: any[]) {
-    return exercises.map((exercise: any) => {
+interface ApiNinjaExercise {
+    name: string;
+    muscle: string;
+    type: string;
+    equipment: string;
+    difficulty: string;
+    instructions: string;
+}
+
+function formatExercises(exercises: ApiNinjaExercise[]) {
+    return exercises.map((exercise: ApiNinjaExercise) => {
         return {
             name: exercise.name,
             muscle: exercise.muscle,
@@ -175,7 +184,7 @@ async function saveExercises(exercises: Exercise[]) {
     const chunkSize = 50;
     for (let i = 0; i < translatedExercises.length; i += chunkSize) {
         const chunk = translatedExercises.slice(i, i + chunkSize);
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('exercises')
             .select('name')
             .in('name', chunk.map(exercise => exercise.name))
@@ -197,7 +206,7 @@ async function saveExercises(exercises: Exercise[]) {
 
 async function main() {
     console.log('Iniciando descarga de ejercicios desde API Ninjas...');
-    const allExercises: any[] = [];
+    const allExercises: ApiNinjaExercise[] = [];
 
     for (const muscle of muscles) {
         console.log(`Descargando ejercicios para: ${muscle}`);

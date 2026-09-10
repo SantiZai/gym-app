@@ -2,9 +2,10 @@
 
 import { createClient } from "./supabase/server";
 import { User } from "@/types/db";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 // Versión para usar en el servidor (Server Actions, API Routes)
-export const upsertUserServer = async (supabaseUser: any): Promise<User> => {
+export const upsertUserServer = async (supabaseUser: SupabaseUser): Promise<User> => {
   const supabase = await createClient();
 
   // Extraer datos del usuario de supabase
@@ -14,8 +15,6 @@ export const upsertUserServer = async (supabaseUser: any): Promise<User> => {
   // Usar la imagen de Google si está disponible
   const userAvatar = avatar_url || picture;
 
-  console.log("Creando/actualizando usuario (server):", { id, email, name });
-  
   // Datos del usuario para insertar/actualizar
   const userData = {
     id,
@@ -39,6 +38,5 @@ export const upsertUserServer = async (supabaseUser: any): Promise<User> => {
     throw error;
   }
 
-  console.log("Usuario creado/actualizado exitosamente:", data);
   return data;
 };

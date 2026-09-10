@@ -1,5 +1,6 @@
 import { createClient } from "./supabase/client";
 import type { Session, SessionSerie } from "@/types/db";
+import type { SessionSummary } from "@/types/progress";
 
 export const startSession = async (routineId: string) => {
   const supabase = await createClient()
@@ -10,6 +11,29 @@ export const startSession = async (routineId: string) => {
   const sesionId = data as unknown as string;
   // redirigir a la ruta de sesión
   window.location.href = `/sesion/${sesionId}`;
+}
+
+export async function getUserSessions(userId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("user_id", userId)
+    .order("date", { ascending: false });
+
+  if (error) throw error;
+  return data as Session[];
+}
+
+export async function getSessionSeriesBySessionId(sessionId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("session_series")
+    .select("*")
+    .eq("session_id", sessionId);
+
+    if (error) throw error;
+    return data as SessionSerie[];
 }
 
 // Obtener sesión con todos sus datos
@@ -167,40 +191,70 @@ export async function startSessionSerie(
   });
 }
 
-// Finalizar sesión y actualizar rutina si hay cambios
-export async function finishSession(sessionId: string) {
+// Finalizar sesión vía RPC (cierra la sesión y devuelve el resumen agregado)
+// y actualizar rutina si hay cambios. Ver sql/functions.sql → finish_session.
+export async function finishSession(sessionId: string): Promise<SessionSummary> {
   const supabase = await createClient();
-  const now = new Date().toISOString();
 
-  // Obtener la sesión
-  const session = await getSessionById(sessionId);
+  const { data, error } = await supabase.rpc("finish_session", { p_session_id: sessionId });
+  if (error) throw error;
 
-  // Calcular duración
-  const startedAt = new Date(session.started_at);
-  const endedAt = new Date(now);
-  const durationMs = endedAt.getTime() - startedAt.getTime();
-  const durationMinutes = Math.floor(durationMs / 60000);
+  const row = (Array.isArray(data) ? data[0] : data) as {
+    session_id: string;
+    started_at: string | null;
+    ended_at: string | null;
+    duration: string | null;
+    total_series_completed: number | string | null;
+    total_volume: number | string | null;
+  } | null | undefined;
 
-  // Actualizar sesión
-  const { error: sessionError } = await supabase
-    .from("sessions")
-    .update({
-      status: "finished",
-      ended_at: now,
-      duration: `${durationMinutes} minutes`,
-    })
-    .eq("id", sessionId);
-
-  if (sessionError) throw sessionError;
+  if (!row) throw new Error("No se pudo finalizar la sesión");
 
   // Analizar cambios y actualizar rutina
-  await analyzeAndUpdateRoutine(sessionId, session.routine_id);
+  await analyzeAndUpdateRoutine(sessionId);
 
-  return { success: true };
+  return {
+    sessionId: row.session_id,
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    durationLabel: formatSessionDuration(row.duration, row.started_at, row.ended_at),
+    totalSeriesCompleted: Number(row.total_series_completed ?? 0),
+    totalVolume: Number(row.total_volume ?? 0),
+  };
+}
+
+export function formatSessionDuration(
+  raw: string | null | undefined,
+  startedAt: string | null | undefined,
+  endedAt: string | null | undefined
+): string {
+  const toLabel = (totalMinutes: number) => {
+    if (!Number.isFinite(totalMinutes) || totalMinutes < 0) return "—";
+    const m = Math.floor(totalMinutes);
+    if (m < 60) return `${m} min`;
+    return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`;
+  };
+
+  // Postgres serializa interval como "[N days ]HH:MM:SS"
+  if (raw) {
+    const match = raw.match(/(?:(\d+)\s+days?\s+)?(\d+):(\d+)(?::(\d+))?/);
+    if (match) {
+      const days = parseInt(match[1] ?? "0", 10);
+      const hours = parseInt(match[2], 10);
+      const minutes = parseInt(match[3], 10);
+      return toLabel(days * 24 * 60 + hours * 60 + minutes);
+    }
+  }
+
+  if (startedAt && endedAt) {
+    const ms = new Date(endedAt).getTime() - new Date(startedAt).getTime();
+    if (Number.isFinite(ms)) return toLabel(ms / 60000);
+  }
+  return "—";
 }
 
 // Analizar sesión y actualizar series de la rutina basado en progreso
-async function analyzeAndUpdateRoutine(sessionId: string, routineId: string) {
+async function analyzeAndUpdateRoutine(sessionId: string) {
   const supabase = await createClient();
 
   // Obtener session_series completadas
@@ -240,7 +294,7 @@ async function analyzeAndUpdateRoutine(sessionId: string, routineId: string) {
       if (serieError || !originalSerie) continue;
 
       // Actualizar si hay cambios significativos
-      const updates: any = {};
+      const updates: { weight?: number | null; reps?: number | null } = {};
       let hasChanges = false;
 
       // Actualizar peso si cambió

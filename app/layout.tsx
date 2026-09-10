@@ -1,7 +1,12 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/navbar";
+import { ThemeProvider } from "@/components/theme-provider";
+import { SonnerToaster } from "@/components/sonner-toaster";
+import { cn } from "@/lib/utils";
+
+const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,6 +21,22 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "GymApp - Tu entrenador personal",
   description: "Gestiona tus rutinas, ejercicios y progreso en el gimnasio",
+  applicationName: "GymApp",
+  appleWebApp: {
+    capable: true,
+    title: "GymApp",
+    statusBarStyle: "default",
+  },
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({
@@ -24,14 +45,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={cn("font-sans", inter.variable)} suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Navbar />
-        <main className="pt-16">
-          {children}
-        </main>
+        <ThemeProvider>
+          <Navbar />
+          <main className="pt-16">
+            {children}
+          </main>
+          <SonnerToaster />
+        </ThemeProvider>
       </body>
     </html>
   );

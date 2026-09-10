@@ -6,8 +6,10 @@ import { usePathname } from "next/navigation";
 import { Menu, X, Dumbbell, User as UserIcon, LogOut, ChevronDown } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { createClient } from "@/utils/supabase/client";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 const navLinks = [
   { href: "/", label: "Inicio" },
@@ -117,7 +119,7 @@ export function Navbar() {
           } ${isVisible && !isOpen ? "translate-y-0" : "-translate-y-full"
           } md:translate-y-0`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo a la izquierda - Desktop */}
             <Link
@@ -125,7 +127,7 @@ export function Navbar() {
               className="hidden md:flex items-center space-x-2"
             >
               <Dumbbell className="h-8 w-8 text-blue-600" strokeWidth={2.5} />
-              <span className="text-xl font-bold text-gray-900">GymApp</span>
+              <span className="text-xl font-bold text-slate-900">GymApp</span>
             </Link>
 
             {/* Logo centrado - Mobile */}
@@ -134,26 +136,26 @@ export function Navbar() {
               className="flex md:hidden items-center space-x-2 absolute left-1/2 transform -translate-x-1/2"
             >
               <Dumbbell className="h-8 w-8 text-blue-600" strokeWidth={2.5} />
-              <span className="text-xl font-bold text-gray-900">GymApp</span>
+              <span className="text-xl font-bold text-slate-900">GymApp</span>
             </Link>
 
-            {/* Links y perfil a la derecha - Desktop */}
+            {/* Links y perfil - Desktop */}
             <div className="hidden md:flex items-center space-x-6">
               {user && navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`font-medium transition-colors duration-200 ${
-                    isActiveLink(link.href)
-                      ? "text-blue-600 font-semibold"
-                      : "text-gray-700 hover:text-blue-600"
-                  }`}
+                  className={`font-medium transition-colors duration-200 ${isActiveLink(link.href)
+                    ? "text-blue-600 font-semibold"
+                    : "text-slate-700 hover:text-blue-600"
+                    }`}
                 >
                   {link.label}
                 </Link>
               ))}
 
               {/* Dropdown de usuario - Desktop */}
+              <ThemeToggle />
               {user ? (
                 <div className="relative" ref={dropdownRef}>
                   <button
@@ -161,35 +163,37 @@ export function Navbar() {
                     className="flex items-center space-x-2 py-2 px-3 rounded-lg hover:bg-blue-400/10 transition-colors duration-200 cursor-pointer"
                   >
                     {user?.avatar_url ? (
-                      <img
+                      <Image
                         src={user.avatar_url}
                         alt={user.name || "User"}
-                        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                        width={32}
+                        height={32}
+                        className="rounded-full object-cover flex-shrink-0"
                       />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
                         {user?.name?.charAt(0).toUpperCase() || "U"}
                       </div>
                     )}
-                    <span className="text-sm font-medium text-gray-700 capitalize">
+                    <span className="text-sm font-medium text-slate-700 capitalize">
                       {user?.name || "Usuario"}
                     </span>
-                    <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform duration-200 flex-shrink-0 ${isDropdownOpen ? "rotate-180" : ""
+                    <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform duration-200 flex-shrink-0 ${isDropdownOpen ? "rotate-180" : ""
                       }`} />
                   </button>
 
                   {/* Dropdown menu */}
                   {isDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50">
                       <Link
-                        href="/profile"
+                        href="/perfil"
                         onClick={() => setIsDropdownOpen(false)}
-                        className="flex items-center space-x-3 px-4 py-3 hover:bg-gray-50 transition-colors duration-200"
+                        className="flex items-center space-x-3 px-4 py-3 hover:bg-slate-50 transition-colors duration-200"
                       >
-                        <UserIcon className="h-4 w-4 text-gray-600" />
-                        <span className="text-sm font-medium text-gray-700">Información personal</span>
+                        <UserIcon className="h-4 w-4 text-slate-600" />
+                        <span className="text-sm font-medium text-slate-700">Información personal</span>
                       </Link>
-                      <div className="border-t border-gray-100 my-1"></div>
+                      <div className="border-t border-slate-200 my-1"></div>
                       <button
                         onClick={handleSignOut}
                         className="flex items-center space-x-3 px-4 py-3 hover:bg-red-50 transition-colors duration-200 w-full text-left cursor-pointer"
@@ -210,30 +214,33 @@ export function Navbar() {
               )}
             </div>
 
-            {/* Botón hamburguesa - Mobile */}
-            {
-              user ? (
-                <button
-                  onClick={() => setIsOpen(!isOpen)}
-                  className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 ml-auto"
-                  aria-label="Toggle menu"
-                >
-                  {isOpen ? (
-                    <X className="h-6 w-6 text-gray-700" />
-                  ) : (
-                    <Menu className="h-6 w-6 text-gray-700" />
-                  )}
-                </button>
-              ) : (
-                <button
-                onClick={() => redirect("/login")}
-                  className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 ml-auto"
-                  aria-label="Toggle menu"
-                >
-                  <UserIcon className="h-6 w-6 text-gray-700" />
-                </button>
-              )
-            }
+            {/* Acciones - Mobile */}
+            <div className="md:hidden ml-auto flex items-center gap-1">
+              <ThemeToggle />
+              {
+                user ? (
+                  <button
+                    onClick={() => setIsOpen(!isOpen)}
+                    className="p-2 rounded-lg hover:bg-slate-100 transition-colors duration-200"
+                    aria-label="Toggle menu"
+                  >
+                    {isOpen ? (
+                      <X className="h-6 w-6 text-slate-700" />
+                    ) : (
+                      <Menu className="h-6 w-6 text-slate-700" />
+                    )}
+                  </button>
+                ) : (
+                  <Link
+                    href="/login"
+                    className="p-2 rounded-lg hover:bg-slate-100 transition-colors duration-200"
+                    aria-label="Iniciar sesión"
+                  >
+                    <UserIcon className="h-6 w-6 text-slate-700" />
+                  </Link>
+                )
+              }
+            </div>
           </div>
         </div>
       </nav>
@@ -254,14 +261,14 @@ export function Navbar() {
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center space-x-2 px-4">
             <Dumbbell className="h-6 w-6 text-blue-600" strokeWidth={2.5} />
-            <span className="text-lg font-bold text-gray-900">GymApp</span>
+            <span className="text-lg font-bold text-slate-900">GymApp</span>
           </div>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+            className="p-2 rounded-lg hover:bg-slate-100 transition-colors duration-200"
             aria-label="Close menu"
           >
-            <X className="h-5 w-5 text-gray-700" />
+            <X className="h-5 w-5 text-slate-700" />
           </button>
         </div>
 
@@ -273,15 +280,13 @@ export function Navbar() {
                 <Link
                   href={link.href}
                   onClick={() => setIsOpen(false)}
-                  className={`group flex items-center space-x-3 px-4 py-3 rounded-xl font-medium transition-all duration-300 ${
-                    isActiveLink(link.href)
-                      ? "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-600 font-semibold"
-                      : "text-gray-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:text-blue-600"
-                  }`}
+                  className={`group flex items-center space-x-3 px-4 py-3 rounded-xl font-medium transition-all duration-300 ${isActiveLink(link.href)
+                    ? "bg-gradient-to-r from-blue-50 to-blue-100 text-blue-600 font-semibold"
+                    : "text-slate-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:text-blue-600"
+                    }`}
                 >
-                  <span className={`flex-shrink-0 w-2 h-2 rounded-full ${
-                    isActiveLink(link.href) ? "bg-blue-600" : "bg-gray-400 group-hover:bg-blue-600"
-                  }`}></span>
+                  <span className={`flex-shrink-0 w-2 h-2 rounded-full ${isActiveLink(link.href) ? "bg-blue-600" : "bg-slate-400 group-hover:bg-blue-600"
+                    }`}></span>
                   <span className="flex-1">{link.label}</span>
                 </Link>
               </li>
@@ -294,16 +299,18 @@ export function Navbar() {
           {user ? (
             <div className="space-y-2">
               <Link
-                href="/profile"
+                href="/perfil"
                 onClick={() => setIsOpen(false)}
-                className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+                className="flex items-center space-x-3 p-3 rounded-lg hover:bg-slate-50 transition-colors duration-200"
               >
                 <div className="relative flex-shrink-0">
                   {user?.avatar_url ? (
-                    <img
+                    <Image
                       src={user.avatar_url}
                       alt={user.name || "User"}
-                      className="w-10 h-10 rounded-full object-cover"
+                      width={40}
+                      height={40}
+                      className="rounded-full object-cover"
                     />
                   ) : (
                     <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
@@ -312,10 +319,10 @@ export function Navbar() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-medium text-slate-900 truncate">
                     {user?.name || "Usuario"}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                  <p className="text-xs text-slate-500 truncate">{user?.email}</p>
                 </div>
               </Link>
               <button

@@ -183,7 +183,7 @@ export async function updateSerie(serieId: string, updates: {
     notes?: string | null;
 }) {
     const supabase = await createClient();
-    const payload: any = {};
+    const payload: { type?: string; reps?: number; weight?: number | null; orden?: number; notes?: string | null } = {};
     
     if (updates.type !== undefined) payload.type = updates.type;
     if (updates.reps !== undefined) payload.reps = parseInt(updates.reps) || 0;
@@ -209,6 +209,17 @@ export async function deleteSerie(serieId: string) {
         .from("series")
         .delete()
         .eq("id", serieId);
+
+    if (error) throw error;
+}
+
+// Eliminar rutina (ejercicios, series y sesiones se eliminan en cascada)
+export async function deleteRoutine(routineId: string) {
+    const supabase = await createClient();
+    const { error } = await supabase
+        .from("routines")
+        .delete()
+        .eq("id", routineId);
 
     if (error) throw error;
 }

@@ -13,6 +13,18 @@ export const getExerciseById = async (id: string) => {
     return data[0]
 }
 
+export const getExerciseByName = async (name: string) => {
+    const supabase = await createClient()
+    const { data, error } = await supabase.from("exercises").select("*").eq("name", name)
+
+    if (error) {
+        console.error(error)
+        return null
+    }
+
+    return data[0]
+}
+
 export const getExercises = async () => {
     const supabase = await createClient()
 

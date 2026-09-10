@@ -1,7 +1,8 @@
 import { createClient } from "./supabase/client";
 import { User } from "@/types/db";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 
-export const upsertUser = async (supabaseUser: any): Promise<User> => {
+export const upsertUser = async (supabaseUser: SupabaseUser): Promise<User> => {
   const supabase = await createClient();
 
   // Extraer datos del usuario de supabase
@@ -11,12 +12,11 @@ export const upsertUser = async (supabaseUser: any): Promise<User> => {
   // Usar la imagen de Google si está disponible
   const userAvatar = avatar_url || picture;
 
-  console.log("user actualizar", supabaseUser);
   // Datos del usuario para insertar/actualizar
   const userData = {
     id,
     email,
-    name: name || email.split("@")[0],
+    name: name || email?.split("@")[0] || "Usuario",
     avatar_url: userAvatar || "",
     unit: "metric",
     updated_at: new Date().toISOString(),
@@ -36,4 +36,20 @@ export const upsertUser = async (supabaseUser: any): Promise<User> => {
   }
 
   return data;
+};
+
+export const updateUserProfile = async (
+  userId: string,
+  updates: { goal?: string | null; height?: number | null; weight?: number | null }
+): Promise<User> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("users")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", userId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as User;
 };

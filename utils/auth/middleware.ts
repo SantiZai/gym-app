@@ -3,17 +3,16 @@ import { z } from "zod";
 export type ActionState = {
   error?: string;
   success?: string;
-  fieldData?: Record<string, any>; //eslint-disable-line
-  [key: string]: any; //eslint-disable-line
+  fieldData?: Record<string, unknown>;
+  [key: string]: unknown;
 };
 
-type ValidatedActionFunction<S extends z.ZodType<any, any>, T> = (
-  //eslint-disable-line
+type ValidatedActionFunction<S extends z.ZodType, T> = (
   data: z.infer<S>,
   formData: FormData
 ) => Promise<T>;
 
-export function validatedAction<S extends z.ZodType<any, any>, T>( //eslint-disable-line
+export function validatedAction<S extends z.ZodType, T>(
   schema: S,
   action: ValidatedActionFunction<S, T>
 ) {

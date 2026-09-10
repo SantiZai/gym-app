@@ -25,7 +25,7 @@ export const signIn = validatedAction(signInSchema, async (data) => {
     return { error: "Invalid credentials. Please try again." };
   }
 
-  const { data: userData, error: userDataError } = await supabase
+  const { error: userDataError } = await supabase
     .from("users")
     .select("*")
     .eq("id", signInData.user.id)
@@ -52,7 +52,7 @@ const signUpSchema = z.object({
     inviteId: z.string().optional()*/
 });
 
-export const signUp = validatedAction(signUpSchema, async (data, formData) => {
+export const signUp = validatedAction(signUpSchema, async (data) => {
   const supabase = await createClient();
   const { email, password } = data;
 
@@ -107,7 +107,6 @@ export const signInWithGoogle = async (
   event: React.FormEvent<HTMLFormElement>
 ) => {
   event.preventDefault();
-  const formData = new FormData(event.currentTarget);
   const supabase = await createClient();
 
   try {

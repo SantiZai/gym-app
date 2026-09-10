@@ -9,6 +9,9 @@ type SessionShape = {
 export function useSessionTimer(session: SessionShape | null) {
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const intervalIdRef = useRef<number | null>(null);
+  const hasSession = session !== null;
+  const startedAt = session?.started_at;
+  const status = session?.status;
 
   useEffect(() => {
     // Cleanup previo por si acaso
@@ -18,24 +21,24 @@ export function useSessionTimer(session: SessionShape | null) {
     }
 
     // Validaciones básicas
-    if (!session) {
+    if (!hasSession) {
       setElapsedTime(0);
       return;
     }
-    if (session.status === "finished") {
+    if (status === "finished") {
       // si está finalizada, no corremos el timer
       return;
     }
-    if (!session.started_at) {
+    if (!startedAt) {
       // si no hay started_at aún, esperamos
       setElapsedTime(0);
       return;
     }
 
     // Parsear fecha de inicio — usar Date.parse para chequear validez
-    const parsed = Date.parse(session.started_at);
+    const parsed = Date.parse(startedAt);
     if (!Number.isFinite(parsed)) {
-      console.warn("useSessionTimer: session.started_at inválido:", session.started_at);
+      console.warn("useSessionTimer: session.started_at inválido:", startedAt);
       setElapsedTime(0);
       return;
     }
@@ -59,7 +62,7 @@ export function useSessionTimer(session: SessionShape | null) {
         intervalIdRef.current = null;
       }
     };
-  }, [session?.started_at, session?.status]);
+  }, [hasSession, startedAt, status]);
 
   const formatElapsedTime = (seconds: number) => {
     if (!Number.isFinite(seconds) || seconds < 0) return "00:00:00";
@@ -70,8 +73,6 @@ export function useSessionTimer(session: SessionShape | null) {
       .toString()
       .padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
-
-  console.log(elapsedTime);
 
   return { elapsedTime, formatElapsedTime };
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,18 +13,24 @@ import {
     getLastPerformedByExerciseIds,
     updateOrCreateSessionSerie,
 } from "@/utils/sessionUtils";
+import { estimate1RM, getPersonalRecords } from "@/utils/progressUtils";
 import type { RoutineExerciseWithDetails, Serie, Session, SessionSerie } from "@/types/db";
+import type { SessionSummary } from "@/types/progress";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { toast } from "sonner";
 import {
     CheckCircle2,
     Circle,
     Timer,
     Dumbbell,
-    X,
-    Check,
-    Play,
     AlertCircle,
+    Trophy,
+    X,
 } from "lucide-react";
 import { useSessionTimer } from "@/hooks/useSessionTimer";
+import { useRestTimer } from "@/hooks/useRestTimer";
+
+const DEFAULT_REST_SECONDS = 90;
 
 export default function SessionPage() {
     const params = useParams();
@@ -38,8 +45,17 @@ export default function SessionPage() {
     const [loading, setLoading] = useState(true);
     const [finishing, setFinishing] = useState(false);
     const [cancelling, setCancelling] = useState(false);
+    const [confirmandoCancelacion, setConfirmandoCancelacion] = useState(false);
+    const [summary, setSummary] = useState<SessionSummary | null>(null);
 
     const { elapsedTime, formatElapsedTime } = useSessionTimer(session);
+    const {
+        restTime,
+        isRunning: resting,
+        startRestTimer,
+        stopRestTimer,
+        formatRestTime,
+    } = useRestTimer();
 
     // Estados para editar pesos y reps
     const [lastPerformedByExercise, setLastPerformedByExercise] = useState<Record<string, {
@@ -47,6 +63,9 @@ export default function SessionPage() {
         reps_performed: number | null;
         completed_at: string | null;
     }>>({});
+
+    // Mejores marcas históricas (1RM est.) por ejercicio, para celebrar récords
+    const [bestByExercise, setBestByExercise] = useState<Record<string, number>>({});
 
     // Estado para valores actuales de peso y reps por serie
     const [serieValues, setSerieValues] = useState<Record<string, {
@@ -69,7 +88,7 @@ export default function SessionPage() {
             const sessionSeriesArr = data.sessionSeries || [];
 
             // Transform the data: Supabase returns exercise as an array sometimes, normalize to object
-            const transformedRoutineExercises = routineExercisesArr.map((re: any) => ({
+            const transformedRoutineExercises = routineExercisesArr.map((re: { exercise?: unknown } & Record<string, unknown>) => ({
                 ...re,
                 exercise: Array.isArray(re.exercise) ? re.exercise[0] : re.exercise
             })) as RoutineExerciseWithDetails[];
@@ -81,8 +100,8 @@ export default function SessionPage() {
 
             // Inicializar valores de peso y reps para cada serie
             const initialValues: Record<string, { weight: string; reps: string }> = {};
-            transformedRoutineExercises.forEach((re: any) => {
-                re.series.forEach((serie: any) => {
+            transformedRoutineExercises.forEach((re) => {
+                re.series.forEach((serie) => {
                     const completedData = sessionSeriesArr.find(
                         (ss: SessionSerie) => ss.serie_id === serie.id && ss.completed
                     );
@@ -111,7 +130,7 @@ export default function SessionPage() {
 
             if (allIds.length > 0) {
                 try {
-                    const lastRows: any[] = await getLastPerformedByExerciseIds(allIds);
+                    const lastRows: { exercise_id: string | null; weight_used: number | null; reps_performed: number | null; completed_at: string | null }[] = await getLastPerformedByExerciseIds(allIds);
                     // lastRows puede ser [] o un array de filas con exercise_id, weight_used, reps_performed, completed_at
                     const mapLast: Record<string, {
                         weight_used: number | null;
@@ -137,9 +156,20 @@ export default function SessionPage() {
                 setLastPerformedByExercise({});
             }
 
+            // Mejores marcas históricas (incluye lo ya completado hoy;
+            // la comparación exige superar estrictamente, así que sigue siendo correcta)
+            try {
+                const records = await getPersonalRecords(sessionObj.user_id);
+                const bests: Record<string, number> = {};
+                for (const r of records) bests[r.exerciseId] = r.bestE1rm;
+                setBestByExercise(bests);
+            } catch {
+                setBestByExercise({});
+            }
+
         } catch (error) {
             console.error("Error cargando sesión:", error);
-            alert("Error al cargar la sesión");
+            toast.error("Error al cargar la sesión");
             router.push("/rutinas");
         } finally {
             setLoading(false);
@@ -329,17 +359,42 @@ export default function SessionPage() {
                 }
             });
 
+            // Celebrar récord en vivo al completar una serie que supera la mejor marca
+            if (completed) {
+                const e1rm = estimate1RM(weight, reps);
+                const prevBest = bestByExercise[exerciseId];
+                if (e1rm != null && prevBest != null && e1rm > prevBest) {
+                    const exName =
+                        routineExercises.find((re) => re.series.some((s) => s.id === serie.id))?.exercise.name ??
+                        "Ejercicio";
+                    toast.success(`¡Nuevo récord en ${exName}!`, {
+                        description: `1RM estimado: ${e1rm} kg (antes ${prevBest} kg)`,
+                        duration: 6000,
+                        icon: <Trophy className="h-5 w-5 text-amber-500" />,
+                    });
+                    setBestByExercise((prev) => ({ ...prev, [exerciseId]: e1rm }));
+                }
+            }
+
+            // Descanso automático al completar (se detiene al desmarcar)
+            if (completed) {
+                startRestTimer(DEFAULT_REST_SECONDS);
+            } else {
+                stopRestTimer();
+            }
+
         } catch (error) {
             console.error("Error completando serie:", error);
-            alert("Error al completar la serie");
+            toast.error("Error al completar la serie");
         }
-    }, [sessionId, serieValues]);
+    }, [sessionId, serieValues, routineExercises, bestByExercise, startRestTimer, stopRestTimer]);
 
 
     // Limpiar timers al desmontar
     useEffect(() => {
+        const timers = debounceTimers.current;
         return () => {
-            Object.values(debounceTimers.current).forEach(timer => clearTimeout(timer));
+            Object.values(timers).forEach(timer => clearTimeout(timer));
         };
     }, []);
 
@@ -350,31 +405,35 @@ export default function SessionPage() {
         return totalSeries > 0 ? (completedSeries / totalSeries) * 100 : 0;
     };
 
-    // Finalizar sesión
+    // Finalizar sesión y mostrar resumen
     const handleFinishSession = async () => {
         try {
             setFinishing(true);
-            await finishSession(sessionId);
-            router.push("/rutinas");
+            stopRestTimer();
+            const result = await finishSession(sessionId);
+            setSession((prev) => (prev ? { ...prev, status: "finished" } : prev));
+            setSummary(result);
         } catch (error) {
             console.error("Error finalizando sesión:", error);
-            alert("Error al finalizar la sesión");
+            toast.error("Error al finalizar la sesión");
         } finally {
             setFinishing(false);
         }
     };
 
-    // Cancelar sesión
+    // Cancelar sesión (con confirmación previa)
     const handleCancelSession = async () => {
         try {
             setCancelling(true);
+            stopRestTimer();
             await cancelSession(sessionId);
             router.push("/rutinas");
         } catch (error) {
             console.error("Error cancelando sesión:", error);
-            alert("Error al cancelar la sesión");
+            toast.error("Error al cancelar la sesión");
         } finally {
             setCancelling(false);
+            setConfirmandoCancelacion(false);
         }
     };
 
@@ -396,7 +455,7 @@ export default function SessionPage() {
             <div className="flex items-center justify-center min-h-screen">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="mt-4 text-gray-600">Cargando sesión...</p>
+                    <p className="mt-4 text-slate-600">Cargando sesión...</p>
                 </div>
             </div>
         );
@@ -407,7 +466,56 @@ export default function SessionPage() {
             <div className="flex items-center justify-center min-h-screen">
                 <div className="text-center">
                     <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
-                    <p className="mt-4 text-gray-600">Sesión no encontrada</p>
+                    <p className="mt-4 text-slate-600">Sesión no encontrada</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (summary) {
+        const volumeLabel =
+            summary.totalVolume >= 1000
+                ? `${(summary.totalVolume / 1000).toFixed(1)} t`
+                : `${summary.totalVolume} kg`;
+        const stats = [
+            { label: "Series", value: String(summary.totalSeriesCompleted) },
+            { label: "Volumen", value: volumeLabel },
+            { label: "Duración", value: summary.durationLabel },
+        ];
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-8">
+                <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border p-8 text-center">
+                    <div className="mx-auto w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
+                        <Trophy className="h-8 w-8 text-amber-500" aria-hidden />
+                    </div>
+                    <h1 className="mt-4 text-2xl font-bold text-slate-900">
+                        ¡Sesión completada!
+                    </h1>
+                    <p className="mt-1 text-sm text-slate-500">
+                        Buen trabajo, cada sesión suma.
+                    </p>
+                    <div className="mt-6 grid grid-cols-3 gap-3">
+                        {stats.map((s) => (
+                            <div key={s.label} className="rounded-xl bg-slate-50 p-3">
+                                <p className="text-lg font-bold text-slate-900">{s.value}</p>
+                                <p className="text-xs text-slate-500">{s.label}</p>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-6 flex flex-col gap-2">
+                        <Link
+                            href="/progreso"
+                            className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200 text-center"
+                        >
+                            Ver mi progreso
+                        </Link>
+                        <Link
+                            href="/rutinas"
+                            className="w-full px-4 py-2.5 bg-white text-slate-700 text-sm font-medium rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors duration-200 text-center"
+                        >
+                            Volver a rutinas
+                        </Link>
+                    </div>
                 </div>
             </div>
         );
@@ -417,16 +525,16 @@ export default function SessionPage() {
     const totalSeries = routineExercises.reduce((acc, re) => acc + re.series.length, 0);
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-20">
+        <div className="min-h-screen bg-slate-50 pb-20">
             {/* Header fijo */}
             <div className="bg-white border-b sticky top-0 z-10 shadow-sm">
                 <div className="max-w-4xl mx-auto px-4 py-4">
                     <div className="flex items-center justify-between mb-3">
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">
+                            <h1 className="text-2xl font-bold text-slate-900">
                                 Sesión en progreso
                             </h1>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-slate-500">
                                 {routineExercises.length} ejercicios
                             </p>
                         </div>
@@ -441,14 +549,14 @@ export default function SessionPage() {
                     {/* Barra de progreso */}
                     <div className="space-y-2">
                         <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Progreso</span>
-                            <span className="font-semibold text-gray-900">
+                            <span className="text-slate-600">Progreso</span>
+                            <span className="font-semibold text-slate-900">
                                 {sessionSeries.filter((ss) => ss.completed).length} /{" "}
                                 {totalSeries}{" "}
                                 series
                             </span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                             <div
                                 className="bg-gradient-to-r from-blue-500 to-blue-600 h-full transition-all duration-500 ease-out"
                                 style={{ width: `${progress}%` }}
@@ -478,7 +586,7 @@ export default function SessionPage() {
                             className="bg-white rounded-lg shadow-sm border overflow-hidden"
                         >
                             {/* Header del ejercicio */}
-                            <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 border-b">
+                            <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4 border-b">
                                 <div className="flex items-start justify-between">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3">
@@ -486,10 +594,10 @@ export default function SessionPage() {
                                                 {idx + 1}
                                             </span>
                                             <div>
-                                                <h3 className="text-lg font-bold text-gray-900">
+                                                <h3 className="text-lg font-bold text-slate-900">
                                                     {routineExercise.exercise.name}
                                                 </h3>
-                                                <div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
+                                                <div className="flex items-center gap-3 mt-1 text-sm text-slate-600">
                                                     {routineExercise.exercise.muscle && (
                                                         <span className="flex items-center gap-1">
                                                             <Dumbbell className="h-4 w-4" />
@@ -501,7 +609,7 @@ export default function SessionPage() {
                                                     )}
                                                     {/* mostrar última vez en header si existe */}
                                                     {lastPerformed && (
-                                                        <span className="text-xs text-gray-500 ml-3">
+                                                        <span className="text-xs text-slate-500 ml-3">
                                                             Última: {lastPerformed.weight_used ?? "0"} kg × {lastPerformed.reps_performed ?? "0"} ({lastPerformed.completed_at ? new Date(lastPerformed.completed_at).toLocaleDateString() : "—"})
                                                         </span>
                                                     )}
@@ -510,10 +618,10 @@ export default function SessionPage() {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <span className="text-sm font-semibold text-gray-900">
+                                        <span className="text-sm font-semibold text-slate-900">
                                             {exerciseCompletedSeries} / {totalExerciseSeries}
                                         </span>
-                                        <div className="w-20 bg-gray-200 rounded-full h-2 mt-1">
+                                        <div className="w-20 bg-slate-200 rounded-full h-2 mt-1">
                                             <div
                                                 className="bg-green-500 h-full rounded-full transition-all duration-300"
                                                 style={{ width: `${exerciseProgress}%` }}
@@ -536,38 +644,32 @@ export default function SessionPage() {
                                             key={serie.id}
                                             className={`p-4 transition-colors ${completed
                                                 ? "bg-green-50"
-                                                : "bg-white hover:bg-gray-50"
+                                                : "bg-white hover:bg-slate-50"
                                                 }`}
                                         >
-                                            <div className="flex items-center gap-4">
+                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
                                                 {/* Indicador de serie */}
-                                                <div className="flex items-center gap-2 min-w-[80px]">
-                                                    <div
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
                                                         onClick={() => {
-                                                            if (completed) {
-                                                                // Descompletar serie
-                                                                handleCompleteSerie(
-                                                                    serie,
-                                                                    routineExercise.exercise.id,
-                                                                    false
-                                                                );
-                                                            } else {
-                                                                handleCompleteSerie(
-                                                                    serie,
-                                                                    routineExercise.exercise.id,
-                                                                    true
-                                                                );
-                                                            }
+                                                            handleCompleteSerie(
+                                                                serie,
+                                                                routineExercise.exercise.id,
+                                                                !completed
+                                                            );
                                                         }}
-                                                        className="p-0 h-auto"
+                                                        aria-pressed={completed}
+                                                        aria-label={`${completed ? "Desmarcar" : "Completar"} serie ${serieIdx + 1}`}
+                                                        className="-m-2 rounded-full p-2"
                                                     >
                                                         {completed ? (
                                                             <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />
                                                         ) : (
-                                                            <Circle className="h-6 w-6 text-gray-300 flex-shrink-0" />
+                                                            <Circle className="h-6 w-6 text-slate-300 flex-shrink-0" />
                                                         )}
-                                                    </div>
-                                                    <span className="font-semibold text-gray-700">
+                                                    </button>
+                                                    <span className="font-semibold text-slate-700">
                                                         Serie {serieIdx + 1}
                                                     </span>
                                                 </div>
@@ -589,10 +691,10 @@ export default function SessionPage() {
                                                             className="w-14 h-9"
                                                             step="0.5"
                                                         />
-                                                        <span className="text-sm text-gray-600">kg</span>
+                                                        <span className="text-sm text-slate-600">kg</span>
                                                         {/* Mostrar lastPerformed si no hay plan y no está completada */}
                                                         {!completed && serie.weight == null && lastPerformed && (
-                                                            <div className="text-xs text-gray-500 ml-2">
+                                                            <div className="text-xs text-slate-500 ml-2">
                                                                 Últ: {lastPerformed.weight_used ?? "—"} kg
                                                             </div>
                                                         )}
@@ -600,14 +702,16 @@ export default function SessionPage() {
                                                     <div className="flex items-center gap-2">
                                                         <Input
                                                             type="number"
+                                                            inputMode="numeric"
                                                             placeholder={serie.reps != null ? String(serie.reps) : (lastPerformed?.reps_performed != null ? String(lastPerformed.reps_performed) : "0")}
                                                             value={currentValues.reps}
                                                             onChange={(e) => handleSerieValueChange(serie.id, routineExercise.exercise.id, 'reps', e.target.value)}
-                                                            className="w-14 h-9"
+                                                            aria-label={`Repeticiones serie ${serieIdx + 1}`}
+                                                            className="w-16 h-11 text-center"
                                                         />
-                                                        <span className="text-sm text-gray-600">reps</span>
+                                                        <span className="text-sm text-slate-600">reps</span>
                                                         {!completed && serie.reps == null && lastPerformed && (
-                                                            <div className="text-xs text-gray-500 ml-2">
+                                                            <div className="text-xs text-slate-500 ml-2">
                                                                 Últ: {lastPerformed.reps_performed ?? "—"}
                                                             </div>
                                                         )}
@@ -618,7 +722,7 @@ export default function SessionPage() {
 
                                             {/* Notas de la serie */}
                                             {serie.notes && (
-                                                <p className="mt-2 text-sm text-gray-600 ml-12">
+                                                <p className="mt-2 text-sm text-slate-600 ml-12">
                                                     💡 {serie.notes}
                                                 </p>
                                             )}
@@ -631,13 +735,39 @@ export default function SessionPage() {
                 })}
             </div>
 
+            {/* Pill de descanso */}
+            {resting && !summary && (
+                <div className="fixed bottom-24 left-1/2 z-20 -translate-x-1/2">
+                    <div className="flex items-center gap-2 rounded-full bg-slate-900 py-2 pl-4 pr-2 text-white shadow-lg">
+                        <Timer className="h-4 w-4 text-blue-300" aria-hidden />
+                        <span className="font-mono text-lg font-bold tabular-nums">
+                            {formatRestTime(restTime)}
+                        </span>
+                        <span className="text-xs text-slate-300">descanso</span>
+                        <button
+                            onClick={() => startRestTimer(restTime + 30)}
+                            className="rounded-full bg-slate-700 px-2.5 py-1 text-xs font-medium hover:bg-slate-600"
+                        >
+                            +30
+                        </button>
+                        <button
+                            onClick={stopRestTimer}
+                            aria-label="Saltar descanso"
+                            className="rounded-full p-1.5 hover:bg-slate-700"
+                        >
+                            <X className="h-4 w-4" aria-hidden />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Footer fijo con acciones */}
             <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
                 <div className="max-w-4xl mx-auto px-4 py-4 flex gap-3">
                     <Button
                         variant="outline"
                         className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
-                        onClick={handleCancelSession}
+                        onClick={() => setConfirmandoCancelacion(true)}
                         disabled={cancelling || finishing}
                     >
                         {cancelling ? "Cancelando..." : "Cancelar Sesión"}
@@ -651,6 +781,15 @@ export default function SessionPage() {
                     </Button>
                 </div>
             </div>
+            <ConfirmDialog
+                open={confirmandoCancelacion}
+                title="Cancelar sesión"
+                description="Se perderá todo el progreso de esta sesión. Esta acción no se puede deshacer."
+                confirmLabel="Sí, cancelar"
+                busy={cancelling}
+                onConfirm={handleCancelSession}
+                onCancel={() => setConfirmandoCancelacion(false)}
+            />
         </div>
     );
 }

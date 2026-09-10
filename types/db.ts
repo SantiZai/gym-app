@@ -2,7 +2,7 @@ export type SessionStatus = "in_progress" | "finished";
 
 export type UnitSystem = "metric" | "imperial";
 
-export type SerieType = "warm-up" | "normal" | "cooldown";
+export type SerieType = "warm-up" | "normal" | "dropset" | "otro";
 
 export interface User {
     id: string;
@@ -13,6 +13,9 @@ export interface User {
     created_at: string;
     updated_at: string;
     last_login: string | null;
+    height: number | null;
+    weight: number | null;
+    goal: string | null;
 }
 
 export interface Routine {
@@ -21,6 +24,8 @@ export interface Routine {
     name: string;
     description: string | null;
     public: boolean;
+    category: string | null;
+    is_template: boolean;
     created_at: string;
     updated_at: string;
 }
@@ -78,7 +83,7 @@ export interface SessionSerie {
     completed_at: string | null;
     created_at: string;
     updated_at: string;
-    metadata: any;
+    metadata: Record<string, unknown> | null;
 }
 
 // Extended type for routine exercises with nested data from joins

@@ -6,15 +6,15 @@ import { User as SupabaseUser, Session } from "@supabase/supabase-js";
 import { User } from "@/types/db";
 import { upsertUser } from "@/utils/userUtils";
 
+// Cachea el sync por usuario: evita upserts duplicados entre
+// getSession + evento INITIAL_SESSION y entre instancias del hook (Navbar + página)
+let syncCache: { userId: string; promise: Promise<User | null> } | null = null;
+
 export const useAuth = () => {
   const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
-
-  useEffect(() => {
-    console.log("user: ", user);
-  }, [user]);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -45,6 +45,7 @@ export const useAuth = () => {
           // Crear/actualizar usuario en nuestra tabla
           await handleUserSync(nextSession.user);
         } else {
+          syncCache = null;
           setSupabaseUser(null);
           setUser(null);
           setSession(null);
@@ -64,9 +65,12 @@ export const useAuth = () => {
 
   const handleUserSync = async (supabaseUser: SupabaseUser) => {
     try {
-      const userData = await upsertUser(supabaseUser);
-      setUser(userData);
+      if (!syncCache || syncCache.userId !== supabaseUser.id) {
+        syncCache = { userId: supabaseUser.id, promise: upsertUser(supabaseUser) };
+      }
+      setUser(await syncCache.promise);
     } catch (error) {
+      syncCache = null;
       console.error("Error syncing user:", error);
       setUser(null);
     }

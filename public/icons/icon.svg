@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="240" fill="#2563eb"/>
+  <!-- barra central -->
+  <rect x="312" y="500" width="400" height="24" rx="12" fill="#ffffff"/>
+  <!-- discos izquierdos -->
+  <rect x="230" y="380" width="54" height="264" rx="20" fill="#ffffff"/>
+  <rect x="300" y="430" width="44" height="164" rx="16" fill="#ffffff"/>
+  <!-- discos derechos (espejo) -->
+  <rect x="740" y="380" width="54" height="264" rx="20" fill="#ffffff"/>
+  <rect x="680" y="430" width="44" height="164" rx="16" fill="#ffffff"/>
+</svg>
