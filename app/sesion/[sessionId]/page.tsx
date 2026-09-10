@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { StepperInput } from "@/components/shared/StepperInput";
 import {
     getSessionData,
     completeSessionSerie,
@@ -632,7 +632,7 @@ export default function SessionPage() {
                             </div>
 
                             {/* Series */}
-                            <div className="divide-y">
+                            <div className="divide-y divide-slate-200">
                                 {routineExercise.series.map((serie, serieIdx) => {
                                     const completed = isSerieCompleted(serie.id);
 
@@ -642,13 +642,12 @@ export default function SessionPage() {
                                     return (
                                         <div
                                             key={serie.id}
-                                            className={`p-4 transition-colors ${completed
+                                            className={`px-4 py-3 transition-colors ${completed
                                                 ? "bg-green-500/10"
-                                                : "bg-white hover:bg-slate-50"
+                                                : "bg-white"
                                                 }`}
                                         >
-                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-                                                {/* Indicador de serie */}
+                                            <div className="flex items-center justify-between gap-3">
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         type="button"
@@ -672,57 +671,47 @@ export default function SessionPage() {
                                                     <span className="font-semibold text-slate-700">
                                                         Serie {serieIdx + 1}
                                                     </span>
+                                                    <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded">
+                                                        {getSerieTypeLabel(serie.type)}
+                                                    </span>
                                                 </div>
+                                                {!completed && (serie.weight == null || serie.reps == null) && lastPerformed && (
+                                                    <span className="shrink-0 text-xs text-slate-500">
+                                                        Últ: {lastPerformed.weight_used ?? "—"} kg × {lastPerformed.reps_performed ?? "—"}
+                                                    </span>
+                                                )}
+                                            </div>
 
-                                                {/* Tipo de serie */}
-                                                <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded">
-                                                    {getSerieTypeLabel(serie.type)}
-                                                </span>
-
-                                                {/* Inputs de peso y reps */}
-                                                <div className="flex-1 flex items-center gap-4">
-
-                                                    <div className="flex items-center gap-2">
-                                                        <Input
-                                                            type="number"
-                                                            placeholder={serie.weight != null ? String(serie.weight) : (lastPerformed?.weight_used != null ? String(lastPerformed.weight_used) : "0")}
-                                                            value={currentValues.weight}
-                                                            onChange={(e) => handleSerieValueChange(serie.id, routineExercise.exercise.id, 'weight', e.target.value)}
-                                                            className="w-14 h-9"
-                                                            step="0.5"
-                                                        />
-                                                        <span className="text-sm text-slate-600">kg</span>
-                                                        {/* Mostrar lastPerformed si no hay plan y no está completada */}
-                                                        {!completed && serie.weight == null && lastPerformed && (
-                                                            <div className="text-xs text-slate-500 ml-2">
-                                                                Últ: {lastPerformed.weight_used ?? "—"} kg
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Input
-                                                            type="number"
-                                                            inputMode="numeric"
-                                                            placeholder={serie.reps != null ? String(serie.reps) : (lastPerformed?.reps_performed != null ? String(lastPerformed.reps_performed) : "0")}
-                                                            value={currentValues.reps}
-                                                            onChange={(e) => handleSerieValueChange(serie.id, routineExercise.exercise.id, 'reps', e.target.value)}
-                                                            aria-label={`Repeticiones serie ${serieIdx + 1}`}
-                                                            className="w-16 h-11 text-center"
-                                                        />
-                                                        <span className="text-sm text-slate-600">reps</span>
-                                                        {!completed && serie.reps == null && lastPerformed && (
-                                                            <div className="text-xs text-slate-500 ml-2">
-                                                                Últ: {lastPerformed.reps_performed ?? "—"}
-                                                            </div>
-                                                        )}
-                                                    </div>
-
+                                            <div className="mt-3 flex items-center justify-center gap-5">
+                                                <div className="flex items-center gap-2">
+                                                    <StepperInput
+                                                        value={currentValues.weight}
+                                                        onChange={(v) => handleSerieValueChange(serie.id, routineExercise.exercise.id, 'weight', v)}
+                                                        step={2.5}
+                                                        inputMode="decimal"
+                                                        ariaLabel={`Peso serie ${serieIdx + 1}`}
+                                                        placeholder={serie.weight != null ? String(serie.weight) : (lastPerformed?.weight_used != null ? String(lastPerformed.weight_used) : "0")}
+                                                        inputWidthClass="w-16"
+                                                    />
+                                                    <span className="text-sm text-slate-600">kg</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <StepperInput
+                                                        value={currentValues.reps}
+                                                        onChange={(v) => handleSerieValueChange(serie.id, routineExercise.exercise.id, 'reps', v)}
+                                                        step={1}
+                                                        inputMode="numeric"
+                                                        ariaLabel={`Repeticiones serie ${serieIdx + 1}`}
+                                                        placeholder={serie.reps != null ? String(serie.reps) : (lastPerformed?.reps_performed != null ? String(lastPerformed.reps_performed) : "0")}
+                                                        inputWidthClass="w-16"
+                                                    />
+                                                    <span className="text-sm text-slate-600">reps</span>
                                                 </div>
                                             </div>
 
                                             {/* Notas de la serie */}
                                             {serie.notes && (
-                                                <p className="mt-2 text-sm text-slate-600 ml-12">
+                                                <p className="mt-2 text-center text-sm text-slate-600">
                                                     💡 {serie.notes}
                                                 </p>
                                             )}

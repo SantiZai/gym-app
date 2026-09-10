@@ -9,6 +9,7 @@ interface StepperInputProps {
   step?: number;
   min?: number;
   ariaLabel: string;
+  placeholder?: string;
   inputMode?: "decimal" | "numeric";
   inputWidthClass?: string;
 }
@@ -19,6 +20,7 @@ export function StepperInput({
   step = 1,
   min = 0,
   ariaLabel,
+  placeholder,
   inputMode = "numeric",
   inputWidthClass = "w-16",
 }: StepperInputProps) {
@@ -41,6 +43,7 @@ export function StepperInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={ariaLabel}
+        placeholder={placeholder}
         min={min}
         step={step}
         className={`${inputWidthClass} h-10 rounded-lg border border-slate-200 bg-white px-1 py-2 text-center text-sm font-medium text-slate-900 shadow-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
