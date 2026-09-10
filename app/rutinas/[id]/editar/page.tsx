@@ -28,6 +28,7 @@ import {
 } from "@/utils/routineUtils";
 import { getExercisesByIds, getExercises } from "@/utils/exercisesUtils";
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
+import { StepperInput } from "@/components/shared/StepperInput";
 import { normalizeMuscleGroup } from "@/lib/muscleGroups";
 import { equipmentLabel } from "@/lib/exerciseLabels";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -662,32 +663,26 @@ export default function EditarRutinaPage() {
 
                                                 {/* Peso */}
                                                 <div className="flex items-center gap-1">
-                                                    <input
-                                                        type="number"
-                                                        inputMode="decimal"
+                                                    <StepperInput
                                                         value={serie.weight ?? ""}
-                                                        onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "weight", String(e.target.value))}
-                                                        aria-label={`Peso serie ${serieIndex + 1}`}
-                                                        className="w-20 px-2 py-2 text-sm font-medium bg-white border border-slate-200 rounded-lg shadow-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                                        placeholder="0"
-                                                        min="0"
-                                                        step="0.5"
+                                                        onChange={(v) => actualizarSerie(ejercicio.id, serie.id, "weight", v)}
+                                                        step={2.5}
+                                                        inputMode="decimal"
+                                                        ariaLabel={`Peso serie ${serieIndex + 1}`}
+                                                        inputWidthClass="w-20"
                                                     />
                                                     <span className="text-xs text-slate-500">kg</span>
                                                 </div>
 
                                                 {/* Repeticiones */}
                                                 <div className="flex items-center gap-1">
-                                                    <input
-                                                        type="number"
-                                                        inputMode="numeric"
+                                                    <StepperInput
                                                         value={serie.reps ?? ""}
-                                                        onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "reps", String(e.target.value))}
-                                                        aria-label={`Reps serie ${serieIndex + 1}`}
-                                                        className="w-16 px-2 py-2 text-sm font-medium bg-white border border-slate-200 rounded-lg shadow-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                                        placeholder="0"
-                                                        min="0"
-                                                        step="1"
+                                                        onChange={(v) => actualizarSerie(ejercicio.id, serie.id, "reps", v)}
+                                                        step={1}
+                                                        inputMode="numeric"
+                                                        ariaLabel={`Reps serie ${serieIndex + 1}`}
+                                                        inputWidthClass="w-16"
                                                     />
                                                     <span className="text-xs text-slate-500">reps</span>
                                                 </div>
