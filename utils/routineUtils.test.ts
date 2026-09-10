@@ -17,4 +17,17 @@ describe("extractRutinaId", () => {
     expect(() => extractRutinaId([{}])).toThrow();
     expect(() => extractRutinaId([{ rutina_id: "" }])).toThrow();
   });
+
+  it("rescata el id vía snapshot si la lectura directa falla", () => {
+    let reads = 0;
+    const tricky = [
+      {
+        get rutina_id() {
+          reads += 1;
+          return reads === 1 ? undefined : "abc";
+        },
+      },
+    ];
+    expect(extractRutinaId(tricky as unknown)).toBe("abc");
+  });
 });

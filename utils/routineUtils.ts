@@ -52,24 +52,34 @@ export function extractRutinaId(data: unknown): string {
     // PostgREST puede devolver la fila como array o como objeto único
     const rows = Array.isArray(data) ? data : data ? [data] : [];
     const id = (rows[0] as { rutina_id?: unknown } | undefined)?.rutina_id;
-    if (typeof id !== "string" || id.length === 0) {
-        let snapshot: string;
-        try {
-            snapshot = JSON.stringify(data);
-        } catch {
-            snapshot = String(data);
-        }
-        console.error(
-            "create_routine_basic sin rutina_id. snapshot:",
-            snapshot,
-            "| typeof:",
-            typeof data,
-            "| isArray:",
-            Array.isArray(data)
-        );
-        throw new Error("La rutina no devolvió identificador");
+    if (typeof id === "string" && id.length > 0) return id;
+
+    // Segunda vía: releer desde snapshot serializado (inmune a objetos
+    // exóticos/proxies donde la lectura directa falla pero JSON sí ve el valor)
+    try {
+        const parsed: unknown = JSON.parse(JSON.stringify(data));
+        const rows2 = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
+        const id2 = (rows2[0] as { rutina_id?: unknown } | undefined)?.rutina_id;
+        if (typeof id2 === "string" && id2.length > 0) return id2;
+    } catch {
+        // ignorar y caer al error informativo
     }
-    return id;
+
+    let snapshot: string;
+    try {
+        snapshot = JSON.stringify(data);
+    } catch {
+        snapshot = String(data);
+    }
+    console.error(
+        "create_routine_basic sin rutina_id. snapshot:",
+        snapshot,
+        "| typeof:",
+        typeof data,
+        "| isArray:",
+        Array.isArray(data)
+    );
+    throw new Error("La rutina no devolvió identificador");
 }
 
 export async function createRoutineBasic(payload: CreateRoutinePayload) {
