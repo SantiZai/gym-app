@@ -11,7 +11,8 @@ export interface TemplateExerciseSpec {
   /** Nombre exacto del ejercicio en el catálogo */
   name: string;
   sets: number;
-  reps: number;
+  /** null = sin prefijar, lo completa el usuario */
+  reps: number | null;
   note?: string;
 }
 
@@ -25,55 +26,42 @@ export interface RoutineTemplate {
 
 export const ROUTINE_TEMPLATES: RoutineTemplate[] = [
   {
-    key: "full-body",
-    name: "Full Body",
-    description: "Cuerpo completo en una sesión, 3 veces por semana.",
-    category: "Full Body",
-    exercises: [
-      { name: "Sentadilla", sets: 3, reps: 8 },
-      { name: "Press de banca", sets: 3, reps: 8 },
-      { name: "Remo con barra", sets: 3, reps: 8 },
-      { name: "Peso muerto rumano", sets: 3, reps: 8 },
-      { name: "Plancha", sets: 3, reps: 45, note: "Mantener segundos" },
-    ],
-  },
-  {
     key: "push",
-    name: "Push — Empuje",
-    description: "Pecho, hombros y tríceps.",
-    category: "Push-Pull-Legs",
+    name: "Pecho, Hombros y Tríceps",
+    description: "Empuje completo: pecho, hombros y tríceps. 4 series por ejercicio, pesos y reps a tu medida.",
+    category: "Push",
     exercises: [
-      { name: "Press de banca", sets: 3, reps: 8 },
-      { name: "Press militar con barra", sets: 3, reps: 8 },
-      { name: "Elevaciones laterales con mancuernas", sets: 3, reps: 12 },
-      { name: "Fondos en paralelas", sets: 3, reps: 10 },
-      { name: "Extension de triceps en polea alta", sets: 3, reps: 12 },
-    ],
-  },
-  {
-    key: "pull",
-    name: "Pull — Tirón",
-    description: "Espalda y bíceps.",
-    category: "Push-Pull-Legs",
-    exercises: [
-      { name: "Peso muerto convencional", sets: 3, reps: 5 },
-      { name: "Dominadas", sets: 3, reps: 8, note: "Usar asistencia si hace falta" },
-      { name: "Remo con barra", sets: 3, reps: 8 },
-      { name: "Jalon al pecho en polea alta", sets: 3, reps: 10 },
-      { name: "Curl de biceps con mancuernas", sets: 3, reps: 12 },
+      { name: "Press de banca", sets: 4, reps: null },
+      { name: "Press militar con barra", sets: 4, reps: null },
+      { name: "Fondos en paralelas", sets: 4, reps: null },
+      { name: "Extension de triceps en polea alta", sets: 4, reps: null },
+      { name: "Elevaciones laterales con mancuernas", sets: 4, reps: null },
     ],
   },
   {
     key: "legs",
-    name: "Legs — Piernas",
-    description: "Cuádriceps, posteriores, glúteos y gemelos.",
-    category: "Push-Pull-Legs",
+    name: "Piernas Completa",
+    description: "Cuádriceps, posteriores, glúteos y gemelos. 4 series por ejercicio, pesos y reps a tu medida.",
+    category: "Piernas",
     exercises: [
-      { name: "Sentadilla", sets: 3, reps: 8 },
-      { name: "Prensa de piernas", sets: 3, reps: 10 },
-      { name: "Zancadas (estocadas) con mancuernas", sets: 3, reps: 10 },
-      { name: "Hip thrust (empuje de cadera)", sets: 3, reps: 12 },
-      { name: "Elevacion de talon de pie", sets: 3, reps: 15 },
+      { name: "Sentadilla", sets: 4, reps: null },
+      { name: "Prensa de piernas", sets: 4, reps: null },
+      { name: "Zancadas (estocadas) con mancuernas", sets: 4, reps: null },
+      { name: "Hip thrust (empuje de cadera)", sets: 4, reps: null },
+      { name: "Elevacion de talon de pie", sets: 4, reps: null },
+    ],
+  },
+  {
+    key: "pull",
+    name: "Espalda y Bíceps",
+    description: "Tirón completo: espalda y bíceps. 4 series por ejercicio, pesos y reps a tu medida.",
+    category: "Pull",
+    exercises: [
+      { name: "Peso muerto convencional", sets: 4, reps: null },
+      { name: "Dominadas", sets: 4, reps: null },
+      { name: "Remo con barra", sets: 4, reps: null },
+      { name: "Jalon al pecho en polea alta", sets: 4, reps: null },
+      { name: "Curl de biceps con mancuernas", sets: 4, reps: null },
     ],
   },
 ];
@@ -88,7 +76,7 @@ export interface MatchedTemplateExercise {
   name: string;
   orden: number;
   sets: number;
-  reps: number;
+  reps: number | null;
   note: string | null;
 }
 

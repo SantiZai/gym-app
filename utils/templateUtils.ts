@@ -29,7 +29,7 @@ export async function createRoutineFromTemplate(template: RoutineTemplate): Prom
     })),
   });
 
-  // Agregar series según la plantilla (peso null: lo completa el usuario)
+  // Agregar series según la plantilla (sin pesos ni reps: los completa el usuario)
   const newRes = await getRoutineExercises(routineId);
   for (const m of matched) {
     const target = newRes.find((nr) => nr.orden === m.orden && nr.exercise_id === m.exerciseId);
@@ -37,7 +37,7 @@ export async function createRoutineFromTemplate(template: RoutineTemplate): Prom
     for (let i = 0; i < m.sets; i++) {
       await createSerie(target.id, {
         type: "normal",
-        reps: String(m.reps),
+        reps: m.reps != null ? String(m.reps) : "",
         weight: "",
         orden: i + 1,
         notes: m.note,

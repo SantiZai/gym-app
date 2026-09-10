@@ -49,13 +49,13 @@ describe("matchTemplateExercises", () => {
     }
   });
 
-  it("las plantillas del catálogo tienen ejercicios y series válidas", () => {
-    expect(ROUTINE_TEMPLATES.length).toBeGreaterThan(0);
+  it("las plantillas tienen 4 series sin pesos ni reps prefijados", () => {
+    expect(ROUTINE_TEMPLATES).toHaveLength(3);
     for (const t of ROUTINE_TEMPLATES) {
       expect(t.exercises.length).toBeGreaterThan(0);
       for (const e of t.exercises) {
-        expect(e.sets).toBeGreaterThan(0);
-        expect(e.reps).toBeGreaterThan(0);
+        expect(e.sets).toBe(4);
+        expect(e.reps).toBeNull();
       }
     }
   });
