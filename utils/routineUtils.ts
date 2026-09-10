@@ -53,7 +53,20 @@ export function extractRutinaId(data: unknown): string {
     const rows = Array.isArray(data) ? data : data ? [data] : [];
     const id = (rows[0] as { rutina_id?: unknown } | undefined)?.rutina_id;
     if (typeof id !== "string" || id.length === 0) {
-        console.error("create_routine_basic sin rutina_id en la respuesta:", data);
+        let snapshot: string;
+        try {
+            snapshot = JSON.stringify(data);
+        } catch {
+            snapshot = String(data);
+        }
+        console.error(
+            "create_routine_basic sin rutina_id. snapshot:",
+            snapshot,
+            "| typeof:",
+            typeof data,
+            "| isArray:",
+            Array.isArray(data)
+        );
         throw new Error("La rutina no devolvió identificador");
     }
     return id;
