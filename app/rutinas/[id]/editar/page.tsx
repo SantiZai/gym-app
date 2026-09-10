@@ -614,7 +614,7 @@ export default function EditarRutinaPage() {
 
                             {/* Series */}
                             <div className="p-4 sm:p-6">
-                                <div className="space-y-2">
+                                <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
                                     {/* Filas de series (deslizar en mobile para duplicar/eliminar) */}
                                     {ejercicio.series.map((serie, serieIndex) => {
                                         return (
@@ -641,85 +641,91 @@ export default function EditarRutinaPage() {
                                                     </>
                                                 }
                                             >
-                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-white px-2 py-2 hover:bg-slate-50 dark:bg-slate-900">
-                                                {/* Número de serie */}
-                                                <span className="w-5 text-center text-sm font-medium text-slate-900">
-                                                    {serieIndex + 1}
-                                                </span>
+                                            <div className="bg-white px-3 py-2.5 hover:bg-slate-50 dark:bg-slate-900">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-2">
+                                                        {/* Número de serie */}
+                                                        <span className="w-5 text-center text-sm font-medium text-slate-900">
+                                                            {serieIndex + 1}
+                                                        </span>
 
-                                                {/* Tipo de serie */}
-                                                <select
-                                                    value={serie.type}
-                                                    onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "type", e.target.value)}
-                                                    aria-label={`Tipo serie ${serieIndex + 1}`}
-                                                    className="w-28 px-2 py-2 text-xs font-medium bg-white border border-slate-200 rounded-lg shadow-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
-                                                >
-                                                    {TIPOS_SERIE.map((tipo) => (
-                                                        <option key={tipo.value} value={tipo.value}>
-                                                            {tipo.label}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                        {/* Tipo de serie */}
+                                                        <select
+                                                            value={serie.type}
+                                                            onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "type", e.target.value)}
+                                                            aria-label={`Tipo serie ${serieIndex + 1}`}
+                                                            className="w-28 px-2 py-2 text-xs font-medium bg-white border border-slate-200 rounded-lg shadow-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
+                                                        >
+                                                            {TIPOS_SERIE.map((tipo) => (
+                                                                <option key={tipo.value} value={tipo.value}>
+                                                                    {tipo.label}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
 
-                                                {/* Peso */}
-                                                <div className="flex items-center gap-1">
-                                                    <StepperInput
-                                                        value={serie.weight ?? ""}
-                                                        onChange={(v) => actualizarSerie(ejercicio.id, serie.id, "weight", v)}
-                                                        step={2.5}
-                                                        inputMode="decimal"
-                                                        ariaLabel={`Peso serie ${serieIndex + 1}`}
-                                                        inputWidthClass="w-20"
-                                                    />
-                                                    <span className="text-xs text-slate-500">kg</span>
+                                                    {/* Acciones (desktop) */}
+                                                    <div className="hidden items-center gap-0.5 sm:flex">
+                                                        <button
+                                                            onClick={() => moverSerie(ejercicio.id, serieIndex, "up")}
+                                                            disabled={serieIndex === 0}
+                                                            className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                                                            title="Mover arriba"
+                                                        >
+                                                            <ChevronUp className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => moverSerie(ejercicio.id, serieIndex, "down")}
+                                                            disabled={serieIndex === ejercicio.series.length - 1}
+                                                            className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                                                            title="Mover abajo"
+                                                        >
+                                                            <ChevronDown className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => duplicarSerie(ejercicio.id, serie.id)}
+                                                            className="p-2 text-blue-500 hover:text-blue-700"
+                                                            title="Duplicar serie"
+                                                        >
+                                                            <Copy className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => eliminarSerie(ejercicio.id, serie.id)}
+                                                            disabled={ejercicio.series.length <= 1}
+                                                            className="p-2 text-red-500 hover:text-red-700 disabled:opacity-30"
+                                                            title="Eliminar serie"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
                                                 </div>
 
-                                                {/* Repeticiones */}
-                                                <div className="flex items-center gap-1">
-                                                    <StepperInput
-                                                        value={serie.reps ?? ""}
-                                                        onChange={(v) => actualizarSerie(ejercicio.id, serie.id, "reps", v)}
-                                                        step={1}
-                                                        inputMode="numeric"
-                                                        ariaLabel={`Reps serie ${serieIndex + 1}`}
-                                                        inputWidthClass="w-16"
-                                                    />
-                                                    <span className="text-xs text-slate-500">reps</span>
-                                                </div>
+                                                <div className="mt-2 flex items-center justify-center gap-4">
+                                                    {/* Peso */}
+                                                    <div className="flex items-center gap-1">
+                                                        <StepperInput
+                                                            value={serie.weight ?? ""}
+                                                            onChange={(v) => actualizarSerie(ejercicio.id, serie.id, "weight", v)}
+                                                            step={2.5}
+                                                            inputMode="decimal"
+                                                            ariaLabel={`Peso serie ${serieIndex + 1}`}
+                                                            inputWidthClass="w-20"
+                                                        />
+                                                        <span className="text-xs text-slate-500">kg</span>
+                                                    </div>
 
-                                                {/* Acciones (desktop) */}
-                                                <div className="ml-auto hidden items-center gap-0.5 sm:flex">
-                                                    <button
-                                                        onClick={() => moverSerie(ejercicio.id, serieIndex, "up")}
-                                                        disabled={serieIndex === 0}
-                                                        className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
-                                                        title="Mover arriba"
-                                                    >
-                                                        <ChevronUp className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => moverSerie(ejercicio.id, serieIndex, "down")}
-                                                        disabled={serieIndex === ejercicio.series.length - 1}
-                                                        className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
-                                                        title="Mover abajo"
-                                                    >
-                                                        <ChevronDown className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => duplicarSerie(ejercicio.id, serie.id)}
-                                                        className="p-2 text-blue-500 hover:text-blue-700"
-                                                        title="Duplicar serie"
-                                                    >
-                                                        <Copy className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => eliminarSerie(ejercicio.id, serie.id)}
-                                                        disabled={ejercicio.series.length <= 1}
-                                                        className="p-2 text-red-500 hover:text-red-700 disabled:opacity-30"
-                                                        title="Eliminar serie"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </button>
+                                                    {/* Repeticiones */}
+                                                    <div className="flex items-center gap-1">
+                                                        <StepperInput
+                                                            value={serie.reps ?? ""}
+                                                            onChange={(v) => actualizarSerie(ejercicio.id, serie.id, "reps", v)}
+                                                            step={1}
+                                                            inputMode="numeric"
+                                                            ariaLabel={`Reps serie ${serieIndex + 1}`}
+                                                            inputWidthClass="w-16"
+                                                        />
+                                                        <span className="text-xs text-slate-500">reps</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             </SwipeableRow>

@@ -108,7 +108,11 @@ export async function getSessionData(sessionId: string) {
   };
 }
 
-// Actualizar o crear session_serie
+// Actualizar o crear session_serie con upsert atómico.
+// El find-then-insert anterior perdía carreras entre guardados concurrentes
+// (doble tap, stepper + completar) con 409 por uq_session_series_sessionid_serieid.
+// created_at se omite a propósito: en el insert lo pone el default de la DB
+// y en el update no debe tocarse.
 export async function updateOrCreateSessionSerie(
   sessionId: string,
   serieId: string | null,
@@ -123,48 +127,23 @@ export async function updateOrCreateSessionSerie(
 ) {
   const supabase = await createClient();
 
-  // Verificar si ya existe
-  const { data: existing, error: findError } = await supabase
+  const { data: row, error } = await supabase
     .from("session_series")
-    .select("*")
-    .eq("session_id", sessionId)
-    .eq("serie_id", serieId)
-    .maybeSingle();
-
-  if (findError) throw findError;
-
-  if (existing) {
-    // Actualizar
-    const { data: updated, error: updateError } = await supabase
-      .from("session_series")
-      .update({
-        ...data,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", existing.id)
-      .select()
-      .single();
-
-    if (updateError) throw updateError;
-    return updated as SessionSerie;
-  } else {
-    // Crear
-    const { data: created, error: createError } = await supabase
-      .from("session_series")
-      .insert({
+    .upsert(
+      {
         session_id: sessionId,
         serie_id: serieId,
         exercise_id: exerciseId,
         ...data,
-        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+      },
+      { onConflict: "session_id,serie_id" }
+    )
+    .select()
+    .single();
 
-    if (createError) throw createError;
-    return created as SessionSerie;
-  }
+  if (error) throw error;
+  return row as SessionSerie;
 }
 
 // Marcar serie como completada

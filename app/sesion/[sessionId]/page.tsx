@@ -13,6 +13,7 @@ import {
     getLastPerformedByExerciseIds,
     updateOrCreateSessionSerie,
 } from "@/utils/sessionUtils";
+import { updateSerie } from "@/utils/routineUtils";
 import { estimate1RM, getPersonalRecords } from "@/utils/progressUtils";
 import type { RoutineExerciseWithDetails, Serie, Session, SessionSerie } from "@/types/db";
 import type { SessionSummary } from "@/types/progress";
@@ -437,16 +438,37 @@ export default function SessionPage() {
         }
     };
 
-    const getSerieTypeLabel = (type: string) => {
+    const getSerieTypeClass = (type: string) => {
         switch (type) {
-            case "normal":
-                return "Normal";
             case "warm-up":
-                return "Calentamiento";
+                return "bg-yellow-100 text-yellow-800";
             case "dropset":
-                return "Dropset";
+            case "otro":
+                return "bg-slate-200 text-slate-700";
             default:
-                return "Otro";
+                return "bg-blue-100 text-blue-700";
+        }
+    };
+
+    // Cambiar el tipo de la serie planificada en medio de la sesión
+    // (persiste en la rutina, igual que los ajustes de peso/reps al finalizar)
+    const handleSerieTypeChange = async (
+        routineExerciseId: string,
+        serieId: string,
+        type: Serie["type"]
+    ) => {
+        setRoutineExercises((prev) =>
+            prev.map((re) =>
+                re.id === routineExerciseId
+                    ? { ...re, series: re.series.map((s) => (s.id === serieId ? { ...s, type } : s)) }
+                    : re
+            )
+        );
+        try {
+            await updateSerie(serieId, { type });
+        } catch (error) {
+            console.error("Error cambiando tipo de serie:", error);
+            toast.error("No se pudo cambiar el tipo de serie");
         }
     };
 
@@ -590,7 +612,7 @@ export default function SessionPage() {
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-3">
-                                            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-sm">
+                                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
                                                 {idx + 1}
                                             </span>
                                             <div className="min-w-0">
@@ -632,7 +654,7 @@ export default function SessionPage() {
                             </div>
 
                             {/* Series */}
-                            <div className="divide-y divide-slate-200">
+                            <div className="divide-y divide-slate-100">
                                 {routineExercise.series.map((serie, serieIdx) => {
                                     const completed = isSerieCompleted(serie.id);
 
@@ -671,9 +693,17 @@ export default function SessionPage() {
                                                     <span className="font-semibold text-slate-700">
                                                         Serie {serieIdx + 1}
                                                     </span>
-                                                    <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded">
-                                                        {getSerieTypeLabel(serie.type)}
-                                                    </span>
+                                                    <select
+                                                        value={serie.type}
+                                                        onChange={(e) => handleSerieTypeChange(routineExercise.id, serie.id, e.target.value as Serie["type"])}
+                                                        aria-label={`Tipo serie ${serieIdx + 1}`}
+                                                        className={`cursor-pointer rounded px-2 py-1 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${getSerieTypeClass(serie.type)}`}
+                                                    >
+                                                        <option value="warm-up">Calentamiento</option>
+                                                        <option value="normal">Normal</option>
+                                                        <option value="dropset">Dropset</option>
+                                                        <option value="otro">Otro</option>
+                                                    </select>
                                                 </div>
                                                 {!completed && (serie.weight == null || serie.reps == null) && lastPerformed && (
                                                     <span className="shrink-0 text-xs text-slate-500">
