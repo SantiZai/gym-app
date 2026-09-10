@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HomeCTA } from "@/components/home-cta";
 
 export default function Home() {
   return (
@@ -12,20 +13,7 @@ export default function Home() {
           <p className="text-lg sm:text-xl text-slate-600 mb-8 max-w-2xl mx-auto">
             Tu compañero perfecto para alcanzar tus objetivos. Gestiona rutinas, registra sesiones de entrenamiento y monitorea tu progreso.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/rutinas"
-              className="px-8 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200 shadow-lg hover:shadow-xl"
-            >
-              Comenzar ahora
-            </Link>
-            <Link
-              href="/progreso"
-              className="px-8 py-3 bg-white text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors duration-200 border-2 border-slate-200"
-            >
-              Ver mi progreso
-            </Link>
-          </div>
+          <HomeCTA />
         </div>
       </section>
 
