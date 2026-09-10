@@ -5,7 +5,7 @@ export interface RoutineHistory {
 }
 
 interface SessionLike {
-  routine_id: string;
+  routine_id: string | null;
   date: string;
 }
 

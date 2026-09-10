@@ -48,38 +48,26 @@ export async function getRoutineExercises(routineId: string) {
     return data;
 }
 
-export function extractRutinaId(data: unknown): string {
-    // PostgREST puede devolver la fila como array o como objeto único
+/** Intento rápido y silencioso de leer el id del RPC (array u objeto). */
+export function tryExtractRutinaId(data: unknown): string | null {
     const rows = Array.isArray(data) ? data : data ? [data] : [];
     const id = (rows[0] as { rutina_id?: unknown } | undefined)?.rutina_id;
     if (typeof id === "string" && id.length > 0) return id;
-
-    // Segunda vía: releer desde snapshot serializado (inmune a objetos
-    // exóticos/proxies donde la lectura directa falla pero JSON sí ve el valor)
     try {
         const parsed: unknown = JSON.parse(JSON.stringify(data));
         const rows2 = Array.isArray(parsed) ? parsed : parsed ? [parsed] : [];
         const id2 = (rows2[0] as { rutina_id?: unknown } | undefined)?.rutina_id;
         if (typeof id2 === "string" && id2.length > 0) return id2;
     } catch {
-        // ignorar y caer al error informativo
+        // ignorar y caer al lookup
     }
+    return null;
+}
 
-    let snapshot: string;
-    try {
-        snapshot = JSON.stringify(data);
-    } catch {
-        snapshot = String(data);
-    }
-    console.error(
-        "create_routine_basic sin rutina_id. snapshot:",
-        snapshot,
-        "| typeof:",
-        typeof data,
-        "| isArray:",
-        Array.isArray(data)
-    );
-    throw new Error("La rutina no devolvió identificador");
+export function extractRutinaId(data: unknown): string {
+    const id = tryExtractRutinaId(data);
+    if (!id) throw new Error("La rutina no devolvió identificador");
+    return id;
 }
 
 export async function createRoutineBasic(payload: CreateRoutinePayload) {
@@ -88,7 +76,29 @@ export async function createRoutineBasic(payload: CreateRoutinePayload) {
         .rpc('create_routine_basic', { p_payload: payload });
 
     if (error) throw error;
-    return extractRutinaId(data);
+
+    // Vía rápida: id en la respuesta del RPC
+    const fast = tryExtractRutinaId(data);
+    if (fast) return fast;
+
+    // Fallback: la rutina ya fue creada por el RPC; buscar la más reciente
+    // del usuario con ese nombre (cubre respuestas que no se pueden parsear)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("La rutina no devolvió identificador");
+    const since = new Date(Date.now() - 120_000).toISOString();
+    const { data: found, error: findError } = await supabase
+        .from("routines")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("name", payload.nombre)
+        .gt("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (findError) throw findError;
+    if (!found) throw new Error("La rutina no devolvió identificador");
+    return found.id as string;
 }
 
 // Obtener series de un routine_exercise

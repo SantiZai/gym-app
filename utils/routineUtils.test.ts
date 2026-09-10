@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractRutinaId } from "./routineUtils";
+import { extractRutinaId, tryExtractRutinaId } from "./routineUtils";
 
 describe("extractRutinaId", () => {
   it("acepta array de filas", () => {
@@ -29,5 +29,11 @@ describe("extractRutinaId", () => {
       },
     ];
     expect(extractRutinaId(tricky as unknown)).toBe("abc");
+  });
+
+  it("tryExtractRutinaId devuelve null sin lanzar", () => {
+    expect(tryExtractRutinaId([{ rutina_id: "abc" }])).toBe("abc");
+    expect(tryExtractRutinaId([])).toBeNull();
+    expect(tryExtractRutinaId(null)).toBeNull();
   });
 });

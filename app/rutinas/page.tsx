@@ -273,7 +273,7 @@ export default function RutinasPage() {
                         <button
                           onClick={() => handleDelete(rutina.id)}
                           disabled={deletingId === rutina.id}
-                          title="Confirmar eliminación (incluye su historial de sesiones)"
+                          title="Confirmar eliminación (las sesiones anteriores se conservan)"
                           className="inline-flex items-center justify-center px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors duration-200 disabled:opacity-50"
                         >
                           <Check className="h-4 w-4" />
@@ -290,7 +290,7 @@ export default function RutinasPage() {
                     ) : (
                       <button
                         onClick={() => handleDelete(rutina.id)}
-                        title="Eliminar rutina y su historial"
+                        title="Eliminar rutina (conserva su historial)"
                         className="inline-flex items-center justify-center px-3 py-2 bg-red-100 text-red-700 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors duration-200"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -299,7 +299,7 @@ export default function RutinasPage() {
                   </div>
                   {confirmingId === rutina.id && (
                     <p className="mt-2 text-xs text-red-600">
-                      Se eliminará la rutina y su historial de sesiones. Confirma con ✓.
+                      Se eliminará la rutina, pero tus sesiones anteriores se conservan en las estadísticas. Confirma con ✓.
                     </p>
                   )}
                 </div>

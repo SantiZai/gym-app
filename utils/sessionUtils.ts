@@ -58,6 +58,12 @@ export async function getSessionData(sessionId: string) {
   // Obtener la sesión
   const session = await getSessionById(sessionId);
 
+  // Las sesiones huérfanas (rutina eliminada) conservan historial pero
+  // no se pueden continuar como sesión activa
+  if (!session.routine_id) {
+    throw new Error("La rutina de esta sesión fue eliminada");
+  }
+
   // Obtener los ejercicios de la rutina con sus series planificadas
   const { data: routineExercises, error: exercisesError } = await supabase
     .from("routine_exercises")

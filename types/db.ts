@@ -62,7 +62,7 @@ export interface Serie {
 export interface Session {
     id: string;
     user_id: string;
-    routine_id: string;
+    routine_id: string | null; // null si la rutina fue eliminada (se conserva el historial)
     date: string;
     notes: string | null;
     started_at: string;
