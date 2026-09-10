@@ -1,0 +1,608 @@
+{
+  "musculos": {
+    "pecho": [
+      {
+        "nombre": "Press de banca",
+        "musculo_principal": "Pectoral mayor",
+        "musculos_secundarios": [
+          "Triceps braquial",
+          "Deltoides anterior"
+        ],
+        "equipamiento": [
+          "Barra",
+          "Banco plano"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Acuestate en el banco con la espalda apoyada, toma la barra con las manos a la anchura de los hombros y empujala hacia arriba hasta estirar completamente los brazos.",
+        "variantes": [
+          "Press de banca con mancuernas",
+          "Press inclinado"
+        ],
+        "sinonimos": [
+          "Press de pecho"
+        ]
+      },
+      {
+        "nombre": "Flexiones de brazos",
+        "musculo_principal": "Pectoral mayor",
+        "musculos_secundarios": [
+          "Triceps braquial",
+          "Deltoides anterior"
+        ],
+        "equipamiento": [
+          "Sin equipo"
+        ],
+        "tipo": [
+          "Fuerza",
+          "Resistencia"
+        ],
+        "instruccion": "Colocate en posicion de plancha con las manos apoyadas en el suelo y los brazos extendidos; baja el cuerpo hasta casi tocar el suelo con el pecho y empuja hacia arriba manteniendo la espalda recta.",
+        "variantes": [
+          "Flexion con rodillas apoyadas",
+          "Flexion diamante"
+        ],
+        "sinonimos": [
+          "Lagartijas"
+        ]
+      },
+      {
+        "nombre": "Aperturas con mancuernas en banco plano",
+        "musculo_principal": "Pectoral mayor",
+        "musculos_secundarios": [
+          "Deltoides anterior"
+        ],
+        "equipamiento": [
+          "Mancuernas",
+          "Banco plano"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Acuestate boca arriba en un banco plano sosteniendo una mancuerna en cada mano; abre los brazos lateralmente con los codos levemente flexionados hasta sentir el estiramiento en el pecho y luego vuelve a la posicion inicial.",
+        "variantes": [
+          "Aperturas en banco inclinado",
+          "Aperturas en banco declinado"
+        ],
+        "sinonimos": [
+          "Fly con mancuernas"
+        ]
+      },
+      {
+        "nombre": "Cruce de poleas (crossover)",
+        "musculo_principal": "Pectoral mayor",
+        "musculos_secundarios": [
+          "Deltoides anterior"
+        ],
+        "equipamiento": [
+          "Polea"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "De pie en medio de la maquina de poleas ajustadas arriba, toma las manillas con cada mano y, con brazos extendidos, cruza los brazos frente a tu pecho realizando una contraccion pectoral.",
+        "variantes": [],
+        "sinonimos": []
+      }
+    ],
+    "espalda": [
+      {
+        "nombre": "Dominadas",
+        "musculo_principal": "Dorsal ancho",
+        "musculos_secundarios": [
+          "Biceps braquial",
+          "Trapecio",
+          "Redondo mayor"
+        ],
+        "equipamiento": [
+          "Barra fija"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Tomate de una barra con agarre prono mas ancho que los hombros y eleva el cuerpo hasta que la barbilla supere la altura de la barra, luego baja controladamente.",
+        "variantes": [
+          "Dominadas con agarre supino"
+        ],
+        "sinonimos": [
+          "Pull-up"
+        ]
+      },
+      {
+        "nombre": "Remo con barra",
+        "musculo_principal": "Dorsal ancho",
+        "musculos_secundarios": [
+          "Trapecio",
+          "Biceps braquial",
+          "Deltoides posterior"
+        ],
+        "equipamiento": [
+          "Barra"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "De pie con la espalda recta, flexiona ligeramente las rodillas y baja el torso hacia adelante; sujeta la barra y tira de ella hacia el abdomen manteniendo los codos cerca del cuerpo.",
+        "variantes": [
+          "Remo con barra T",
+          "Remo invertido con barra"
+        ],
+        "sinonimos": []
+      },
+      {
+        "nombre": "Remo con mancuerna a un brazo",
+        "musculo_principal": "Dorsal ancho",
+        "musculos_secundarios": [
+          "Trapecio",
+          "Biceps braquial",
+          "Deltoides posterior"
+        ],
+        "equipamiento": [
+          "Mancuernas",
+          "Banco plano"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Apoya una rodilla y mano en un banco plano, manteniendo la espalda recta; con la otra mano, sujeta una mancuerna y remala hacia arriba hasta que el codo llegue al torso.",
+        "variantes": [],
+        "sinonimos": [
+          "Remo unilateral con mancuerna"
+        ]
+      },
+      {
+        "nombre": "Peso muerto rumano",
+        "musculo_principal": "Isquiotibiales",
+        "musculos_secundarios": [
+          "Gluteo mayor",
+          "Erectores espinales"
+        ],
+        "equipamiento": [
+          "Barra"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "De pie con la barra en las manos, manten la espalda recta, flexiona muy ligeramente las rodillas y desliza la barra hacia abajo por las piernas hasta sentir el estiramiento en isquiotibiales; vuelve a subir.",
+        "variantes": [
+          "Peso muerto con piernas rigidas"
+        ],
+        "sinonimos": []
+      },
+      {
+        "nombre": "Jalon al pecho en polea alta",
+        "musculo_principal": "Dorsal ancho",
+        "musculos_secundarios": [
+          "Biceps braquial",
+          "Trapecio"
+        ],
+        "equipamiento": [
+          "Polea alta",
+          "Barra"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Sentado frente a la maquina de poleas, sujeta la barra con agarre amplio; jala la barra hacia el pecho manteniendo el torso erguido.",
+        "variantes": [
+          "Jalon tras la nuca"
+        ],
+        "sinonimos": []
+      }
+    ],
+    "hombros": [
+      {
+        "nombre": "Press militar con barra",
+        "musculo_principal": "Deltoides anterior",
+        "musculos_secundarios": [
+          "Triceps braquial",
+          "Deltoides medio"
+        ],
+        "equipamiento": [
+          "Barra",
+          "Banco"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Sentado o de pie, toma la barra a la altura de los hombros con las manos un poco mas alla de la anchura de los hombros; empuja hacia arriba y regresa controladamente.",
+        "variantes": [
+          "Press con mancuernas sentado"
+        ],
+        "sinonimos": [
+          "Press militar sentado"
+        ]
+      },
+      {
+        "nombre": "Elevaciones laterales con mancuernas",
+        "musculo_principal": "Deltoides medio",
+        "musculos_secundarios": null,
+        "equipamiento": [
+          "Mancuernas"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "De pie, con la espalda recta, sosten una mancuerna en cada mano; eleva los brazos hacia los lados hasta la altura de los hombros y baja lentamente.",
+        "variantes": [],
+        "sinonimos": []
+      },
+      {
+        "nombre": "Elevaciones frontales con mancuernas",
+        "musculo_principal": "Deltoides anterior",
+        "musculos_secundarios": null,
+        "equipamiento": [
+          "Mancuernas"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "De pie con la espalda recta, sosten una mancuerna en cada mano; eleva los brazos hacia adelante hasta la altura de los hombros y baja lentamente.",
+        "variantes": [],
+        "sinonimos": []
+      },
+      {
+        "nombre": "Remo al menton con barra",
+        "musculo_principal": "Deltoides medio",
+        "musculos_secundarios": [
+          "Trapecio",
+          "Biceps braquial"
+        ],
+        "equipamiento": [
+          "Barra"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "De pie, toma la barra al frente y elevala hacia el menton manteniendo los codos hacia arriba y separados.",
+        "variantes": [
+          "Remo al menton con mancuernas"
+        ],
+        "sinonimos": [
+          "Remo alto con barra"
+        ]
+      }
+    ],
+    "brazos": [
+      {
+        "nombre": "Curl de biceps con mancuernas",
+        "musculo_principal": "Biceps braquial",
+        "musculos_secundarios": [
+          "Braquial anterior"
+        ],
+        "equipamiento": [
+          "Mancuernas"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "De pie con la espalda recta, sosten una mancuerna en cada mano; flexiona los codos llevando las mancuernas hacia los hombros y baja controladamente.",
+        "variantes": [
+          "Curl alterno",
+          "Curl martillo"
+        ],
+        "sinonimos": [
+          "Curl de biceps alterno"
+        ]
+      },
+      {
+        "nombre": "Curl de biceps con barra EZ",
+        "musculo_principal": "Biceps braquial",
+        "musculos_secundarios": [
+          "Braquial anterior"
+        ],
+        "equipamiento": [
+          "Barra EZ"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "De pie con la espalda recta, agarra la barra EZ con las manos en semisupinacion; flexiona los codos llevando la barra hacia los hombros y baja lentamente.",
+        "variantes": [],
+        "sinonimos": []
+      },
+      {
+        "nombre": "Extension de triceps en polea alta",
+        "musculo_principal": "Triceps braquial",
+        "musculos_secundarios": null,
+        "equipamiento": [
+          "Polea",
+          "Cuerda"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "De pie frente a la polea alta, sujeta la cuerda y extiende los antebrazos hacia abajo hasta estirar completamente los codos.",
+        "variantes": [
+          "Patada de triceps con mancuerna"
+        ],
+        "sinonimos": []
+      },
+      {
+        "nombre": "Fondos en paralelas",
+        "musculo_principal": "Triceps braquial",
+        "musculos_secundarios": [
+          "Pectoral mayor",
+          "Deltoides anterior"
+        ],
+        "equipamiento": [
+          "Paralelas"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Apoyate en las barras paralelas con los brazos extendidos; baja el cuerpo flexionando los codos y empuja para volver a la posicion inicial.",
+        "variantes": [],
+        "sinonimos": [
+          "Dips en paralelas"
+        ]
+      }
+    ],
+    "piernas": [
+      {
+        "nombre": "Sentadilla",
+        "musculo_principal": "Cuadriceps",
+        "musculos_secundarios": [
+          "Gluteo mayor",
+          "Isquiotibiales"
+        ],
+        "equipamiento": [
+          "Barra",
+          "Soportes para barra"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Con la barra apoyada en la parte superior de la espalda, desciende flexionando rodillas y caderas manteniendo la espalda estable; vuelve a subir.",
+        "variantes": [
+          "Sentadilla frontal",
+          "Sentadilla sumo"
+        ],
+        "sinonimos": [
+          "Squat"
+        ]
+      },
+      {
+        "nombre": "Prensa de piernas",
+        "musculo_principal": "Cuadriceps",
+        "musculos_secundarios": [
+          "Gluteo mayor"
+        ],
+        "equipamiento": [
+          "Maquina prensa"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Sentado en la maquina, empuja la plataforma con las piernas hasta extender las rodillas sin bloquearlas y regresa lentamente.",
+        "variantes": [
+          "Prensa inclinada",
+          "Prensa horizontal"
+        ],
+        "sinonimos": []
+      },
+      {
+        "nombre": "Zancadas (estocadas) con mancuernas",
+        "musculo_principal": "Cuadriceps",
+        "musculos_secundarios": [
+          "Isquiotibiales",
+          "Gluteo mayor"
+        ],
+        "equipamiento": [
+          "Mancuernas"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Da un paso hacia adelante y flexiona ambas rodillas hasta acercar la rodilla trasera al suelo; vuelve y alterna las piernas.",
+        "variantes": [
+          "Zancada inversa",
+          "Zancada lateral"
+        ],
+        "sinonimos": [
+          "Estocada"
+        ]
+      },
+      {
+        "nombre": "Peso muerto convencional",
+        "musculo_principal": "Isquiotibiales",
+        "musculos_secundarios": [
+          "Gluteo mayor",
+          "Trapecio",
+          "Erectores espinales"
+        ],
+        "equipamiento": [
+          "Barra"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Con la barra en el suelo, flexiona caderas y rodillas para sujetarla; levantala extendiendo caderas y rodillas mientras mantienes la espalda estable.",
+        "variantes": [],
+        "sinonimos": []
+      },
+      {
+        "nombre": "Cinta de correr (trote)",
+        "musculo_principal": "Cuadriceps",
+        "musculos_secundarios": [
+          "Gluteos",
+          "Gemelos"
+        ],
+        "equipamiento": [
+          "Cinta de correr"
+        ],
+        "tipo": [
+          "Cardio"
+        ],
+        "instruccion": "Colocate en la cinta y ajusta la velocidad para trotar a un ritmo constante durante el tiempo deseado.",
+        "variantes": [],
+        "sinonimos": [
+          "Trote en cinta"
+        ]
+      }
+    ],
+    "gluteos": [
+      {
+        "nombre": "Hip thrust (empuje de cadera)",
+        "musculo_principal": "Gluteo mayor",
+        "musculos_secundarios": [
+          "Isquiotibiales"
+        ],
+        "equipamiento": [
+          "Barra",
+          "Banco"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Con la parte alta de la espalda apoyada en un banco y la barra sobre las caderas, empuja la pelvis hacia arriba hasta extender la cadera y contrae los gluteos.",
+        "variantes": [
+          "Puente de gluteo",
+          "Elevacion de cadera en suelo"
+        ],
+        "sinonimos": []
+      },
+      {
+        "nombre": "Patada de gluteo en polea",
+        "musculo_principal": "Gluteo mayor",
+        "musculos_secundarios": [
+          "Isquiotibiales"
+        ],
+        "equipamiento": [
+          "Polea",
+          "Tobillera"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Sujeta la tobillera a la polea baja y extiende la pierna hacia atras contrayendo el gluteo; regresa lentamente.",
+        "variantes": [],
+        "sinonimos": []
+      },
+      {
+        "nombre": "Puente de gluteo con peso",
+        "musculo_principal": "Gluteo mayor",
+        "musculos_secundarios": [
+          "Isquiotibiales"
+        ],
+        "equipamiento": [
+          "Barra"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Acostado boca arriba con las rodillas flexionadas y una barra sobre las caderas, eleva la pelvis hasta alinear el tronco y contrae los gluteos; baja lentamente.",
+        "variantes": [],
+        "sinonimos": [
+          "Puente de cadera"
+        ]
+      }
+    ],
+    "core": [
+      {
+        "nombre": "Plancha",
+        "musculo_principal": "Recto abdominal",
+        "musculos_secundarios": [
+          "Oblicuos",
+          "Erectores espinales"
+        ],
+        "equipamiento": [
+          "Sin equipo"
+        ],
+        "tipo": [
+          "Fuerza",
+          "Equilibrio"
+        ],
+        "instruccion": "Apoyate sobre antebrazos y puntas de los pies, manteniendo el cuerpo en linea recta; contrae el abdomen y manten la posicion.",
+        "variantes": [
+          "Plancha lateral"
+        ],
+        "sinonimos": []
+      },
+      {
+        "nombre": "Crunch abdominal",
+        "musculo_principal": "Recto abdominal",
+        "musculos_secundarios": null,
+        "equipamiento": [
+          "Sin equipo"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Acostado boca arriba con las rodillas flexionadas, eleva ligeramente el torso mediante la contraccion abdominal y baja con control.",
+        "variantes": [
+          "Crunch inverso"
+        ],
+        "sinonimos": [
+          "Abdominal"
+        ]
+      },
+      {
+        "nombre": "Crunch inverso en banco inclinado",
+        "musculo_principal": "Recto abdominal",
+        "musculos_secundarios": null,
+        "equipamiento": [
+          "Banco inclinado"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Acostado en un banco inclinado, sujeta los agarres y contrae el abdomen para elevar las piernas hacia el torso.",
+        "variantes": [],
+        "sinonimos": []
+      },
+      {
+        "nombre": "Superman",
+        "musculo_principal": "Erectores espinales",
+        "musculos_secundarios": [
+          "Gluteos"
+        ],
+        "equipamiento": [
+          "Sin equipo"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Acostado boca abajo, eleva simultaneamente brazos, pecho y piernas unos centimetros del suelo; manten brevemente y baja con control.",
+        "variantes": [],
+        "sinonimos": []
+      }
+    ],
+    "gemelos": [
+      {
+        "nombre": "Elevacion de talon de pie",
+        "musculo_principal": "Gemelos",
+        "musculos_secundarios": null,
+        "equipamiento": [
+          "Sin equipo"
+        ],
+        "tipo": [
+          "Fuerza",
+          "Equilibrio"
+        ],
+        "instruccion": "De pie, eleva los talones del suelo contrayendo los gemelos y baja lentamente hasta apoyar los pies.",
+        "variantes": [
+          "Elevacion de talon en escalon"
+        ],
+        "sinonimos": []
+      },
+      {
+        "nombre": "Elevacion de talon sentado",
+        "musculo_principal": "Soleo",
+        "musculos_secundarios": [
+          "Gemelos"
+        ],
+        "equipamiento": [
+          "Silla o banco"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Sentado con las rodillas flexionadas, eleva los talones manteniendo las puntas de los pies apoyadas y baja lentamente.",
+        "variantes": [],
+        "sinonimos": []
+      }
+    ]
+  }
+}

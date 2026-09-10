@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { matchTemplateExercises, ROUTINE_TEMPLATES, type RoutineTemplate } from "./routineTemplates";
+import catalogJson from "../ejercicios_gimnasio.json";
 
 const CATALOG = [
   { id: "a", name: "Barbell Full Squat" },
@@ -33,6 +34,19 @@ describe("matchTemplateExercises", () => {
     const { matched, missing } = matchTemplateExercises(template, CATALOG);
     expect(matched).toHaveLength(1);
     expect(missing).toEqual(["Inexistente"]);
+  });
+
+  it("todas las plantillas matchean el catálogo curado", () => {
+    const catalog = (
+      Object.values(catalogJson.musculos) as { nombre: string }[][]
+    )
+      .flat()
+      .map((e) => ({ id: e.nombre, name: e.nombre }));
+    expect(catalog.length).toBeGreaterThan(0);
+    for (const t of ROUTINE_TEMPLATES) {
+      const { missing } = matchTemplateExercises(t, catalog);
+      expect(missing).toEqual([]);
+    }
   });
 
   it("las plantillas del catálogo tienen ejercicios y series válidas", () => {

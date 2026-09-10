@@ -9,6 +9,7 @@ export const MUSCLE_GROUPS = [
   "Brazos",
   "Core",
   "Glúteos",
+  "Gemelos",
 ] as const;
 
 export type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
@@ -25,14 +26,13 @@ const RAW_TO_GROUP: Record<string, MuscleGroup> = {
   dorsal: "Espalda",
   quadriceps: "Piernas",
   hamstrings: "Piernas",
-  calves: "Piernas",
+  calves: "Gemelos",
   abductors: "Piernas",
   adductors: "Piernas",
   pierna: "Piernas",
   piernas: "Piernas",
   cuadriceps: "Piernas",
   isquios: "Piernas",
-  gemelos: "Piernas",
   shoulders: "Hombros",
   traps: "Hombros",
   neck: "Hombros",
@@ -52,6 +52,22 @@ const RAW_TO_GROUP: Record<string, MuscleGroup> = {
   glutes: "Glúteos",
   gluteos: "Glúteos",
   "glúteos": "Glúteos",
+  gluteo: "Glúteos",
+  "gluteo mayor": "Glúteos",
+  gemelos: "Gemelos",
+  gemelo: "Gemelos",
+  soleo: "Gemelos",
+  pantorrilla: "Gemelos",
+  pantorrillas: "Gemelos",
+  pectorales: "Pecho",
+  dorsales: "Espalda",
+  deltoides: "Hombros",
+  deltoide: "Hombros",
+  isquiotibiales: "Piernas",
+  abdominal: "Core",
+  "recto abdominal": "Core",
+  oblicuos: "Core",
+  oblicuo: "Core",
 };
 
 export function normalizeMuscleGroup(raw: string | null | undefined): MuscleGroup | null {
@@ -76,4 +92,5 @@ export const MUSCLE_GROUP_COLORS: Record<MuscleGroup, string> = {
   Brazos: "#ec4899",
   Core: "#06b6d4",
   "Glúteos": "#f97316",
+  Gemelos: "#84cc16",
 };
