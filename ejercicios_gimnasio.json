@@ -189,6 +189,60 @@
           "Jalon tras la nuca"
         ],
         "sinonimos": []
+      },
+      {
+        "nombre": "Remo en maquina",
+        "musculo_principal": "Dorsal ancho",
+        "musculos_secundarios": [
+          "Romboides",
+          "Trapecio medio",
+          "Deltoides posterior",
+          "Biceps braquial",
+          "Flexores del antebrazo"
+        ],
+        "equipamiento": [
+          "Maquina de remo"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Ajusta el asiento y el pecho a la maquina, toma los agarres y tira de ellos hacia el torso llevando los codos hacia atras; regresa lentamente sin perder la tension.",
+        "variantes": [
+          "Remo en maquina con agarre neutro",
+          "Remo en maquina con agarre amplio",
+          "Remo en maquina unilateral"
+        ],
+        "sinonimos": [
+          "Remo sentado en maquina",
+          "Remo de espalda en maquina",
+          "Seated machine row"
+        ]
+      },
+      {
+        "nombre": "Pullover",
+        "musculo_principal": "Dorsal ancho",
+        "musculos_secundarios": [
+          "Pectoral mayor",
+          "Redondo mayor",
+          "Triceps braquial"
+        ],
+        "equipamiento": [
+          "Mancuerna",
+          "Banco plano"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Acuestate sobre un banco sosteniendo una mancuerna sobre el pecho con los brazos ligeramente flexionados; baja el peso por detras de la cabeza mediante el movimiento de los hombros y vuelve a la posicion inicial.",
+        "variantes": [
+          "Pullover con barra",
+          "Pullover en polea",
+          "Pullover en maquina"
+        ],
+        "sinonimos": [
+          "Pullover con mancuerna",
+          "Dumbbell pullover"
+        ]
       }
     ],
     "hombros": [
@@ -336,6 +390,57 @@
         "variantes": [],
         "sinonimos": [
           "Dips en paralelas"
+        ]
+      },
+      {
+        "nombre": "Curl Scott",
+        "musculo_principal": "Biceps braquial",
+        "musculos_secundarios": [
+          "Braquial anterior",
+          "Braquiorradial"
+        ],
+        "equipamiento": [
+          "Banco Scott",
+          "Barra EZ"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "Sientate en el banco Scott con la parte posterior de los brazos apoyada en el almohadon; flexiona los codos para llevar la barra hacia los hombros y baja lentamente sin despegar los brazos.",
+        "variantes": [
+          "Curl Scott con barra recta",
+          "Curl Scott con mancuernas",
+          "Curl Scott en maquina"
+        ],
+        "sinonimos": [
+          "Curl predicador",
+          "Preacher curl",
+          "Curl de biceps Scott"
+        ]
+      },
+      {
+        "nombre": "Curl martillo",
+        "musculo_principal": "Braquiorradial",
+        "musculos_secundarios": [
+          "Braquial anterior",
+          "Biceps braquial",
+          "Flexores del antebrazo"
+        ],
+        "equipamiento": [
+          "Mancuernas"
+        ],
+        "tipo": [
+          "Fuerza"
+        ],
+        "instruccion": "De pie con una mancuerna en cada mano y las palmas enfrentadas, manten los codos junto al cuerpo y flexionalos para subir las mancuernas hacia los hombros; baja con control.",
+        "variantes": [
+          "Curl martillo alterno",
+          "Curl martillo sentado",
+          "Curl martillo con cuerda en polea"
+        ],
+        "sinonimos": [
+          "Curl de martillo",
+          "Hammer curl"
         ]
       }
     ],

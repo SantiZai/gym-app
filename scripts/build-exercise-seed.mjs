@@ -31,18 +31,39 @@ const nonEmpty = (v) => {
 };
 
 const rows = [];
+const seen = new Set();
+const pushRow = (name, muscle, type, equipment, instructions, origin) => {
+  const key = name.trim().toLowerCase();
+  if (seen.has(key)) return false;
+  seen.add(key);
+  rows.push(
+    `(${esc(name)}, ${esc(muscle)}, ${esc(type)}, ${esc(equipment)}, ${esc(instructions)}, '${origin}')`
+  );
+  return true;
+};
+
 for (const [groupKey, list] of Object.entries(src.musculos)) {
   const muscle = GROUP_ES[groupKey];
   if (!muscle) throw new Error(`Grupo desconocido: ${groupKey}`);
   for (const ex of list) {
     let instructions = ex.instruccion || "";
-    const variantes = nonEmpty(ex.variantes);
+    const variantes = Array.isArray(ex.variantes) ? ex.variantes.map((v) => v.trim()).filter(Boolean) : [];
     const sinonimos = nonEmpty(ex.sinonimos);
-    if (variantes) instructions += `\n\nVariantes: ${variantes}`;
     if (sinonimos) instructions += `\nTambién conocido como: ${sinonimos}`;
-    rows.push(
-      `(${esc(ex.nombre)}, ${esc(muscle)}, ${esc(join(ex.tipo))}, ${esc(join(ex.equipamiento))}, ${esc(instructions)}, 'curated')`
-    );
+    const type = join(ex.tipo);
+    const equipment = join(ex.equipamiento);
+    pushRow(ex.nombre, muscle, type, equipment, instructions, "curated");
+    // Cada variante es un ejercicio agregable por sí mismo
+    for (const v of variantes) {
+      pushRow(
+        v,
+        muscle,
+        type,
+        equipment,
+        `${ex.instruccion || ""}\nVariante de: ${ex.nombre}`,
+        "curated-variant"
+      );
+    }
   }
 }
 
