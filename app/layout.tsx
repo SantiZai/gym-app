@@ -5,6 +5,7 @@ import { Navbar } from "@/components/navbar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SonnerToaster } from "@/components/sonner-toaster";
 import { cn } from "@/lib/utils";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -59,6 +60,7 @@ export default function RootLayout({
           </main>
           <SonnerToaster />
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
