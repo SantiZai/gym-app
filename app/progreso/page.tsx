@@ -18,6 +18,7 @@ import { ShareProgress } from "@/components/progreso/ShareProgress";
 import { TrainingCalendar } from "@/components/progreso/TrainingCalendar";
 import { StreakCard } from "@/components/progreso/StreakCard";
 import { VolumeChart } from "@/components/progreso/VolumeChart";
+import { rangeDescription } from "@/lib/bodyMap";
 import { cn } from "cn";
 
 const RANGES: { key: ProgressRangeKey; label: string }[] = [
@@ -114,6 +115,11 @@ export default function ProgresoPage() {
                 records={records}
                 totalSessions={summary.totalSessions}
                 activeDays={summary.activeDays}
+                muscles={muscles}
+                days={days}
+                userId={userId}
+                userName={user?.name ?? ""}
+                periodLabel={rangeDescription(range)}
               />
               <div className="flex gap-1 rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
                 {RANGES.map((r) => (
