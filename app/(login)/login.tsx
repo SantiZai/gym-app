@@ -37,13 +37,13 @@ export const Login = ({ mode = "signin" }: { mode?: "signin" | "signup" }) => {
         <div className="flex flex-col items-center">
           <Image
             src="/icons/icon-192.png"
-            alt="DiaUno"
+            alt="Habitus"
             width={56}
             height={56}
             className="rounded-2xl"
             priority
           />
-          <p className="mt-3 text-xl font-bold text-slate-900">DiaUno</p>
+          <p className="mt-3 text-xl font-bold text-slate-900">Habitus</p>
         </div>
 
         <h1 className="mt-8 text-2xl font-semibold tracking-tight text-center text-slate-900">

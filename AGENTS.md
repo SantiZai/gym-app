@@ -1,4 +1,4 @@
-# Project Context: Gym App
+# Project Context: Habitus
 
 A Next.js 15+ application using React 19, Supabase, and Tailwind CSS.
 

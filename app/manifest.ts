@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "DiaUno - Tu entrenador personal",
-    short_name: "DiaUno",
-    description: "Gestiona tus rutinas, ejercicios y progreso en el gimnasio",
+    name: "Habitus - Entrenamiento con propósito",
+    short_name: "Habitus",
+    description: "Gestiona tus rutinas, ejercicios y progreso. Entrenamiento con propósito.",
     start_url: "/",
     display: "standalone",
     background_color: "#ffffff",

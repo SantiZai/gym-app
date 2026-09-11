@@ -20,19 +20,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DiaUno - Tu entrenador personal",
-  description: "Gestiona tus rutinas, ejercicios y progreso en el gimnasio",
-  applicationName: "DiaUno",
+  title: "Habitus - Entrenamiento con propósito",
+  description: "Gestiona tus rutinas, ejercicios y progreso. Entrenamiento con propósito.",
+  applicationName: "Habitus",
   appleWebApp: {
     capable: true,
-    title: "DiaUno",
+    title: "Habitus",
     statusBarStyle: "default",
   },
   icons: {
     apple: "/icons/apple-touch-icon.png",
   },
   verification: {
-    google: "VUYkP1Bf88G2x1JXh_AePUzLS0EkYrmoK4mTXmePLNY",
+    google: [
+      "VUYkP1Bf88G2x1JXh_AePUzLS0EkYrmoK4mTXmePLNY",
+      "52wmuP5njQQpk_C8Dti6v4b5F2S4XhvIJ4Hia6zCk2g",
+    ],
   },
 };
 

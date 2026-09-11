@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Política de Privacidad - DiaUno",
-  description: "Cómo DiaUno recolecta, usa y protege tus datos.",
+  title: "Política de Privacidad - Habitus",
+  description: "Cómo Habitus recolecta, usa y protege tus datos.",
 };
 
 const SECTIONS: { title: string; body: string[] }[] = [
   {
     title: "1. Responsable",
     body: [
-      "DiaUno es una aplicación de seguimiento de entrenamiento. Para consultas sobre privacidad escribinos a diaunosoporte@gmail.com.",
+      "Habitus es una aplicación de seguimiento de entrenamiento. Para consultas sobre privacidad escribinos a diaunosoporte@gmail.com.",
     ],
   },
   {

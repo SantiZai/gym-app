@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, Dumbbell, User as UserIcon, LogOut, ChevronDown } from "lucide-react";
+import { Menu, X, User as UserIcon, LogOut, ChevronDown } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { CafecitoMenuCard, CafecitoNavbarButton } from "@/components/cafecito-button";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -126,8 +127,8 @@ export function Navbar() {
               href="/"
               className="hidden md:flex items-center space-x-2"
             >
-              <Dumbbell className="h-8 w-8 text-blue-600" strokeWidth={2.5} />
-              <span className="text-xl font-bold text-slate-900">DiaUno</span>
+              <Image src="/icons/icon.svg" alt="Habitus" width={32} height={32} className="rounded-lg" />
+              <span className="text-xl font-bold text-slate-900">Habitus</span>
             </Link>
 
             {/* Logo centrado - Mobile */}
@@ -135,12 +136,12 @@ export function Navbar() {
               href="/"
               className="flex md:hidden items-center space-x-2 absolute left-1/2 transform -translate-x-1/2"
             >
-              <Dumbbell className="h-8 w-8 text-blue-600" strokeWidth={2.5} />
-              <span className="text-xl font-bold text-slate-900">DiaUno</span>
+              <Image src="/icons/icon.svg" alt="Habitus" width={32} height={32} className="rounded-lg" />
+              <span className="text-xl font-bold text-slate-900">Habitus</span>
             </Link>
 
             {/* Links y perfil - Desktop */}
-            <div className="hidden md:flex items-center space-x-6">
+            <div className="hidden md:flex items-center gap-4 lg:gap-6">
               {user && navLinks.map((link) => (
                 <Link
                   key={link.href}
@@ -155,6 +156,7 @@ export function Navbar() {
               ))}
 
               {/* Dropdown de usuario - Desktop */}
+              <CafecitoNavbarButton />
               <ThemeToggle />
               {user ? (
                 <div className="relative" ref={dropdownRef}>
@@ -260,8 +262,8 @@ export function Navbar() {
         {/* Header del menú */}
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center space-x-2 px-4">
-            <Dumbbell className="h-6 w-6 text-blue-600" strokeWidth={2.5} />
-            <span className="text-lg font-bold text-slate-900">DiaUno</span>
+            <Image src="/icons/icon.svg" alt="Habitus" width={28} height={28} className="rounded-lg" />
+            <span className="text-lg font-bold text-slate-900">Habitus</span>
           </div>
           <button
             onClick={() => setIsOpen(false)}
@@ -298,6 +300,7 @@ export function Navbar() {
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-white">
           {user ? (
             <div className="space-y-2">
+              <CafecitoMenuCard onClick={() => setIsOpen(false)} />
               <Link
                 href="/perfil"
                 onClick={() => setIsOpen(false)}
@@ -337,13 +340,16 @@ export function Navbar() {
               </button>
             </div>
           ) : (
-            <Link
-              href="/login"
-              onClick={() => setIsOpen(false)}
-              className="block w-full px-4 py-3 bg-blue-600 text-white text-center rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200"
-            >
-              Iniciar sesión
-            </Link>
+            <div className="space-y-2">
+              <CafecitoMenuCard onClick={() => setIsOpen(false)} />
+              <Link
+                href="/login"
+                onClick={() => setIsOpen(false)}
+                className="block w-full px-4 py-3 bg-blue-600 text-white text-center rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200"
+              >
+                Iniciar sesión
+              </Link>
+            </div>
           )}
         </div>
       </div>

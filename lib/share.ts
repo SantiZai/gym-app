@@ -8,7 +8,7 @@ interface ShareInput {
 }
 
 export function buildShareText({ streak, records, totalSessions, activeDays }: ShareInput): string {
-  const lines = ["🏋️ Mi progreso en DiaUno"];
+  const lines = ["🏋️ Mi progreso en Habitus"];
 
   if (streak && (streak.current > 0 || streak.best > 0)) {
     lines.push(`🔥 Racha: ${streak.current} ${streak.current === 1 ? "semana seguida" : "semanas seguidas"} (récord: ${streak.best})`);

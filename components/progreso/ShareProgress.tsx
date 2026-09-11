@@ -21,7 +21,7 @@ export function ShareProgress({ streak, records, totalSessions, activeDays }: Pr
     setFailed(false);
     try {
       if (typeof navigator !== "undefined" && "share" in navigator) {
-        await navigator.share({ title: "Mi progreso en DiaUno", text });
+        await navigator.share({ title: "Mi progreso en Habitus", text });
         return;
       }
       throw new Error("share no disponible");
