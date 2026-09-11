@@ -11,6 +11,7 @@ import { StatCard } from "@/components/shared/StatCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExerciseProgress } from "@/components/progreso/ExerciseProgress";
+import { BodyMap } from "@/components/progreso/BodyMap";
 import { MuscleChart } from "@/components/progreso/MuscleChart";
 import { RecordsList } from "@/components/progreso/RecordsList";
 import { ShareProgress } from "@/components/progreso/ShareProgress";
@@ -20,6 +21,7 @@ import { VolumeChart } from "@/components/progreso/VolumeChart";
 import { cn } from "cn";
 
 const RANGES: { key: ProgressRangeKey; label: string }[] = [
+  { key: "week", label: "Esta semana" },
   { key: "30d", label: "30 días" },
   { key: "90d", label: "90 días" },
   { key: "all", label: "Todo" },
@@ -104,9 +106,9 @@ export default function ProgresoPage() {
       <div className="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
         <SectionHeader
           title="Mi progreso"
-          description="Evolución por ejercicio, zonas musculares, récords, calendario y racha."
+          description="Mapa corporal, evolución por ejercicio, récords, calendario y racha."
           action={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <ShareProgress
                 streak={streak}
                 records={records}
@@ -131,11 +133,13 @@ export default function ProgresoPage() {
           }
         />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard title="Sesiones" value={String(summary.totalSessions)} subtitle="en el historial" icon={Dumbbell} accent="blue" />
-          <StatCard title="Días activos" value={String(summary.activeDays)} subtitle="días entrenados" icon={CalendarDays} accent="green" />
-          <StatCard title="Racha actual" value={`${summary.currentStreak} sem`} subtitle="semanas seguidas" icon={Flame} accent="orange" />
-          <StatCard title="Mejor racha" value={`${summary.bestStreak} sem`} subtitle="récord personal" icon={Trophy} accent="purple" />
+        <BodyMap muscles={muscles} range={range} loading={loadingMuscles} />
+
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard compact title="Sesiones" value={String(summary.totalSessions)} subtitle="en el historial" icon={Dumbbell} accent="blue" />
+          <StatCard compact title="Días activos" value={String(summary.activeDays)} subtitle="días entrenados" icon={CalendarDays} accent="green" />
+          <StatCard compact title="Racha actual" value={`${summary.currentStreak} sem`} subtitle="semanas seguidas" icon={Flame} accent="orange" />
+          <StatCard compact title="Mejor racha" value={`${summary.bestStreak} sem`} subtitle="récord personal" icon={Trophy} accent="purple" />
         </div>
 
         <div className="flex gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">

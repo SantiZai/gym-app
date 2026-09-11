@@ -1,4 +1,4 @@
-export type ProgressRangeKey = "30d" | "90d" | "all";
+export type ProgressRangeKey = "week" | "30d" | "90d" | "all";
 
 export interface ExerciseHistoryPoint {
   date: string; // ISO

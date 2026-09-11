@@ -11,6 +11,8 @@ interface StatCardProps {
   icon: LucideIcon;
   accent?: "blue" | "green" | "purple" | "orange";
   className?: string;
+  /** Versión densa para grillas 2x2 */
+  compact?: boolean;
 }
 
 const ACCENTS: Record<NonNullable<StatCardProps["accent"]>, string> = {
@@ -27,17 +29,18 @@ export function StatCard({
   icon: Icon,
   accent = "blue",
   className,
+  compact = false,
 }: StatCardProps) {
   return (
     <Card className={cn("border-slate-200 shadow-sm", className)}>
-      <CardContent className="flex items-center gap-4 p-5">
-        <div className={cn("rounded-xl p-3", ACCENTS[accent])}>
-          <Icon className="h-6 w-6" aria-hidden />
+      <CardContent className={cn("flex items-center gap-4 p-5", compact && "gap-3 p-3")}>
+        <div className={cn("rounded-xl p-3", ACCENTS[accent], compact && "rounded-lg p-2")}>
+          <Icon className={cn("h-6 w-6", compact && "h-5 w-5")} aria-hidden />
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-slate-500">{title}</p>
-          <p className="truncate text-2xl font-bold text-slate-900">{value}</p>
-          {subtitle ? (
+          <p className={cn("truncate text-2xl font-bold text-slate-900", compact && "text-xl")}>{value}</p>
+          {subtitle && !compact ? (
             <p className="truncate text-xs text-slate-500">{subtitle}</p>
           ) : null}
         </div>

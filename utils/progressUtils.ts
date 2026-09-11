@@ -1,6 +1,6 @@
 import { createClient } from "@/utils/supabase/client";
 import { normalizeMuscleGroup } from "@/lib/muscleGroups";
-import { calcWeeklyStreak, dayKeyFromISO } from "@/lib/streak";
+import { calcWeeklyStreak, dayKeyFromISO, getMonday } from "@/lib/streak";
 import type {
   DaySessionDetail,
   ExerciseHistoryPoint,
@@ -24,6 +24,7 @@ export function estimate1RM(weight: number | null, reps: number | null): number 
 
 export function rangeToSince(range: ProgressRangeKey): Date | null {
   if (range === "all") return null;
+  if (range === "week") return getMonday(new Date()); // lunes 00:00 de esta semana
   const days = range === "30d" ? 30 : 90;
   const d = new Date();
   d.setDate(d.getDate() - days);
