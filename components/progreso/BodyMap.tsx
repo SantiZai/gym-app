@@ -73,35 +73,35 @@ export function BodyMap({ muscles, range, loading }: Props) {
 
   return (
     <ChartCard title="Mapa corporal" description="Intensidad por zona · tocá un músculo para detallar">
-      {muscles.length === 0 ? (
-        <p className="py-4 text-center text-sm text-slate-500">
-          Todavía no hay entrenos en este período.
-        </p>
-      ) : (
-        <div className="mx-auto flex w-full max-w-md items-start justify-center gap-2">
-          <div className="min-w-0 flex-1">
-            <Model
-              type="anterior"
-              data={modelData}
-              highlightedColors={BODY_BLUE_SCALE}
-              bodyColor={bodyColor}
-              onClick={handleMuscleClick}
-              style={{ width: "100%", maxWidth: 200, margin: "0 auto" }}
-            />
-            <p className="mt-1 text-center text-xs text-slate-500">Frente</p>
-          </div>
-          <div className="min-w-0 flex-1">
-            <Model
-              type="posterior"
-              data={modelData}
-              highlightedColors={BODY_BLUE_SCALE}
-              bodyColor={bodyColor}
-              onClick={handleMuscleClick}
-              style={{ width: "100%", maxWidth: 200, margin: "0 auto" }}
-            />
-            <p className="mt-1 text-center text-xs text-slate-500">Espalda</p>
-          </div>
+      <div className="mx-auto flex w-full max-w-md items-start justify-center gap-2">
+        <div className="min-w-0 flex-1">
+          <Model
+            type="anterior"
+            data={modelData}
+            highlightedColors={BODY_BLUE_SCALE}
+            bodyColor={bodyColor}
+            onClick={handleMuscleClick}
+            style={{ width: "100%", maxWidth: 200, margin: "0 auto" }}
+          />
+          <p className="mt-1 text-center text-xs text-slate-500">Frente</p>
         </div>
+        <div className="min-w-0 flex-1">
+          <Model
+            type="posterior"
+            data={modelData}
+            highlightedColors={BODY_BLUE_SCALE}
+            bodyColor={bodyColor}
+            onClick={handleMuscleClick}
+            style={{ width: "100%", maxWidth: 200, margin: "0 auto" }}
+          />
+          <p className="mt-1 text-center text-xs text-slate-500">Espalda</p>
+        </div>
+      </div>
+
+      {muscles.length === 0 && (
+        <p className="mt-2 text-center text-sm text-slate-500">
+          Sin entrenos en este período.
+        </p>
       )}
 
       <div className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-center" aria-live="polite">
