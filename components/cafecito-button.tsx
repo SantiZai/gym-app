@@ -16,7 +16,7 @@ export function CafecitoNavbarButton({ className }: { className?: string }) {
       title="¿Te gusta la app? Invitame un café"
       aria-label="¿Te gusta la app? Invitame un café"
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900 transition-colors duration-200 hover:bg-amber-100",
+        "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900 transition-colors duration-200 hover:bg-amber-100 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-200/70 dark:hover:bg-amber-900/40",
         className
       )}
     >
@@ -40,20 +40,20 @@ export function CafecitoMenuCard({ className, onClick }: { className?: string; o
       title="¿Te gusta la app? Invitame un café"
       aria-label="¿Te gusta la app? Invitame un café"
       className={cn(
-        "flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 transition-colors duration-200 hover:bg-amber-100",
+        "flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 transition-colors duration-200 hover:bg-amber-100 dark:border-amber-800/40 dark:bg-amber-950/30 dark:hover:bg-amber-900/30",
         className
       )}
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-200/60">
-        <Coffee className="h-4 w-4 text-amber-900" aria-hidden />
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-200/60 dark:bg-amber-900/50">
+        <Coffee className="h-4 w-4 text-amber-900 dark:text-amber-200/70" aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[11px] leading-tight text-amber-700">¿Te gusta la app?</span>
-        <span className="block truncate text-sm font-semibold leading-tight text-amber-900">
+        <span className="block text-[11px] leading-tight text-amber-700 dark:text-amber-200/50">¿Te gusta la app?</span>
+        <span className="block truncate text-sm font-semibold leading-tight text-amber-900 dark:text-amber-100/75">
           Invitame un café
         </span>
       </span>
-      <ArrowUpRight className="h-4 w-4 shrink-0 text-amber-700" aria-hidden />
+      <ArrowUpRight className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-200/50" aria-hidden />
     </a>
   );
 }
