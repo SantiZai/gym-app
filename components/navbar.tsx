@@ -7,7 +7,7 @@ import { Menu, X, User as UserIcon, LogOut, ChevronDown } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { CafecitoMenuCard, CafecitoNavbarButton } from "@/components/cafecito-button";
+import { APP_VERSION } from "@/lib/version";import { CafecitoMenuCard, CafecitoNavbarButton } from "@/components/cafecito-button";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -351,6 +351,7 @@ export function Navbar() {
               </Link>
             </div>
           )}
+          <p className="mt-3 text-center text-[11px] text-slate-400">{APP_VERSION}</p>
         </div>
       </div>
     </>

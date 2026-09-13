@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { HomeCTA } from "@/components/home-cta";
+import { APP_VERSION } from "@/lib/version";
 
 export default function Home() {
   return (
@@ -65,6 +66,7 @@ export default function Home() {
           <p className="text-slate-400">
             © {new Date().getFullYear()} Habitus. Todos los derechos reservados.
           </p>
+          <p className="mt-1 text-xs text-slate-500">{APP_VERSION}</p>
           <Link
             href="/privacidad"
             className="mt-2 inline-block text-sm text-slate-400 underline-offset-4 hover:text-slate-200 hover:underline"
