@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getTrainingDays, getWeeklyStreak } from "./progressUtils";
+import { getTrainingDays, getWeeklyStreak, invalidateProgressDataset } from "./progressUtils";
 
 const mockState = vi.hoisted(() => ({ sessions: 0, series: 0 }));
 
@@ -25,6 +25,7 @@ vi.mock("@/utils/supabase/client", () => ({
 beforeEach(() => {
   mockState.sessions = 0;
   mockState.series = 0;
+  invalidateProgressDataset("u1");
 });
 
 describe("dedup de peticiones concurrentes", () => {
@@ -39,8 +40,12 @@ describe("dedup de peticiones concurrentes", () => {
     expect(mockState.series).toBe(0);
   });
 
-  it("peticiones secuenciales sí vuelven a pedir (sin caché rancia)", async () => {
+  it("la caché corta evita refetches y al invalidar vuelve a pedir", async () => {
     await getTrainingDays("u1", "all");
+    await getTrainingDays("u1", "all");
+    expect(mockState.sessions).toBe(1);
+
+    invalidateProgressDataset("u1");
     await getTrainingDays("u1", "all");
     expect(mockState.sessions).toBe(2);
   });

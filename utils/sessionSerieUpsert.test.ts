@@ -4,6 +4,9 @@ import { updateOrCreateSessionSerie } from "./sessionUtils";
 const mockState = vi.hoisted(() => ({
   updates: 0,
   inserts: 0,
+  rpcCalls: 0,
+  // "ok" | "missing": si el RPC save_session_serie_values existe en la DB
+  rpcBehavior: "missing" as "ok" | "missing",
   // cola de respuestas para cada update().select(), en orden
   updateQueue: [] as Record<string, unknown>[][],
   // "ok" | "conflict": qué hace el insert
@@ -12,6 +15,16 @@ const mockState = vi.hoisted(() => ({
 
 vi.mock("@/utils/supabase/client", () => ({
   createClient: vi.fn(async () => ({
+    rpc: () => {
+      if (mockState.rpcBehavior === "missing") {
+        return Promise.reject(new Error("function save_session_serie_values does not exist"));
+      }
+      mockState.rpcCalls += 1;
+      return Promise.resolve({
+        data: [{ id: "ss-rpc", session_id: "ses1", serie_id: "ser1", exercise_id: "ex1", completed: false }],
+        error: null,
+      });
+    },
     from: () => {
       const state: { mode: null | "update" | "insert"; payload: unknown } = {
         mode: null,
@@ -56,6 +69,8 @@ vi.mock("@/utils/supabase/client", () => ({
 beforeEach(() => {
   mockState.updates = 0;
   mockState.inserts = 0;
+  mockState.rpcCalls = 0;
+  mockState.rpcBehavior = "missing";
   mockState.updateQueue = [];
   mockState.insertBehavior = "ok";
 });
@@ -91,5 +106,40 @@ describe("updateOrCreateSessionSerie", () => {
     expect(mockState.updates).toBe(2);
     expect(mockState.inserts).toBe(1);
     expect(row.id).toBe("ss1");
+  });
+
+  it("tipeo de peso/reps usa el RPC en 1 llamada (sin update ni insert)", async () => {
+    mockState.rpcBehavior = "ok";
+
+    const row = await updateOrCreateSessionSerie("ses1", "ser1", "ex1", { weight_used: 60, reps_performed: 10 });
+
+    expect(mockState.rpcCalls).toBe(1);
+    expect(mockState.updates).toBe(0);
+    expect(mockState.inserts).toBe(0);
+    expect(row.id).toBe("ss-rpc");
+    expect(row.weight_used).toBe(60);
+    expect(row.reps_performed).toBe(10);
+    expect(row.completed).toBe(false);
+  });
+
+  it("si el RPC no existe en la DB, el tipeo cae al upsert legacy", async () => {
+    mockState.rpcBehavior = "missing";
+    mockState.updateQueue = [[{ id: "ss1", weight_used: 50 }]];
+
+    const row = await updateOrCreateSessionSerie("ses1", "ser1", "ex1", { weight_used: 60 });
+
+    expect(mockState.updates).toBe(1);
+    expect(mockState.inserts).toBe(0);
+    expect(row.id).toBe("ss1");
+  });
+
+  it("datos con completed no usan el RPC de valores (van al legacy)", async () => {
+    mockState.rpcBehavior = "ok";
+    mockState.updateQueue = [[{ id: "ss1" }]];
+
+    await updateOrCreateSessionSerie("ses1", "ser1", "ex1", { weight_used: 60, completed: true });
+
+    expect(mockState.rpcCalls).toBe(0);
+    expect(mockState.updates).toBe(1);
   });
 });

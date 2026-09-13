@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { CalendarDays, Dumbbell, Flame, Trophy } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useExerciseHistory, usePersonalRecords, useProgressOverview, useTrainedExercises, useVolumeHistory } from "@/hooks/useProgress";
@@ -10,16 +11,32 @@ import { SectionHeader } from "@/components/shared/SectionHeader";
 import { StatCard } from "@/components/shared/StatCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExerciseProgress } from "@/components/progreso/ExerciseProgress";
-import { BodyMap } from "@/components/progreso/BodyMap";
-import { MuscleChart } from "@/components/progreso/MuscleChart";
 import { RecordsList } from "@/components/progreso/RecordsList";
 import { ShareProgress } from "@/components/progreso/ShareProgress";
 import { TrainingCalendar } from "@/components/progreso/TrainingCalendar";
 import { StreakCard } from "@/components/progreso/StreakCard";
-import { VolumeChart } from "@/components/progreso/VolumeChart";
 import { rangeDescription } from "@/lib/bodyMap";
 import { cn } from "cn";
+
+// Los gráficos (recharts ~toda la lib + react-body-highlighter) van en chunks
+// separados con ssr:false: no bloquean el JS inicial de /progreso y cada tab
+// solo descarga su chunk al mostrarse.
+const ExerciseProgress = dynamic(
+  () => import("@/components/progreso/ExerciseProgress").then((m) => m.ExerciseProgress),
+  { ssr: false, loading: () => <Skeleton className="h-[320px] w-full" /> }
+);
+const BodyMap = dynamic(
+  () => import("@/components/progreso/BodyMap").then((m) => m.BodyMap),
+  { ssr: false, loading: () => <Skeleton className="h-[280px] w-full" /> }
+);
+const MuscleChart = dynamic(
+  () => import("@/components/progreso/MuscleChart").then((m) => m.MuscleChart),
+  { ssr: false, loading: () => <Skeleton className="h-[280px] w-full" /> }
+);
+const VolumeChart = dynamic(
+  () => import("@/components/progreso/VolumeChart").then((m) => m.VolumeChart),
+  { ssr: false, loading: () => <Skeleton className="h-[280px] w-full" /> }
+);
 
 const RANGES: { key: ProgressRangeKey; label: string }[] = [
   { key: "week", label: "Esta semana" },

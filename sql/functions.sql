@@ -9,6 +9,8 @@
 -- Estado:
 -- - start_session, create_routine_basic y
 --   get_last_performed_by_exercises_by_last_planned_series: en uso por la app.
+-- - save_session_serie_values: en uso (tipeo peso/reps, updateOrCreateSessionSerie).
+--   Ver sql/migrations/perf_save_serie_values_rpc.sql.
 -- - finish_session: en uso; incluye fix 42702 de
 --   sql/migrations/fix_finish_session_ambiguous.sql (aplicar en DB).
 -- - finish_session, record_or_update_series y get_last_performed_by_exercises:
@@ -153,46 +155,25 @@ CREATE OR REPLACE FUNCTION public.get_last_performed_by_exercises_by_last_planne
  RETURNS TABLE(exercise_id uuid, weight_used numeric, reps_performed integer, completed_at timestamp with time zone, session_id uuid, session_series_id uuid, serie_id uuid, is_planned boolean)
  LANGUAGE sql
  SECURITY DEFINER
+ STABLE
 AS $function$
+-- Reescrita en sql/migrations/perf_session_series_indexes.sql: DISTINCT ON
+-- (sin MAX correlacionado ni window) + filtrada al usuario actual.
 with
--- 1) identificar la "última serie planificada" (max orden) por exercise_id
+-- sesiones propias (la versión anterior no filtraba por usuario)
+mine as (
+  select s.id from public.sessions s where s.user_id = auth.uid()
+),
+-- 1) "última serie planificada" (max orden) por exercise_id, en una pasada
 last_planned_series as (
-  select
-    re.exercise_id,
-    s.id as serie_id,
-    s.orden
+  select distinct on (re.exercise_id) re.exercise_id, s.id as serie_id
   from public.series s
-  join public.routine_exercises re on s.routine_exercise_id = re.id
+  join public.routine_exercises re on re.id = s.routine_exercise_id
   where re.exercise_id = any(p_exercise_ids)
-    and s.orden = (
-      select max(s2.orden)
-      from public.series s2
-      join public.routine_exercises re2 on s2.routine_exercise_id = re2.id
-      where re2.exercise_id = re.exercise_id
-    )
-  -- si hay múltiples routine_exercises para el mismo exercise_id con series
-  -- esta subconsulta toma las series con orden máximo por cada exercise_id
+  order by re.exercise_id, s.orden desc
 ),
-
--- 2) candidates from planned last series: session_series rows that complete those planned series
-planned_candidates as (
-  select
-    lp.exercise_id,
-    ss.weight_used,
-    ss.reps_performed,
-    ss.completed_at,
-    ss.session_id,
-    ss.id as session_series_id,
-    ss.serie_id,
-    true as is_planned
-  from public.session_series ss
-  join last_planned_series lp on ss.serie_id = lp.serie_id
-  where ss.completed = true
-    and ss.completed_at is not null
-),
-
--- 3) fallback candidates: latest completed session_series per exercise (any serie)
-general_candidates as (
+-- 2) un solo scan de mis series completadas, marcando si es planificada
+candidates as (
   select
     ss.exercise_id,
     ss.weight_used,
@@ -201,29 +182,17 @@ general_candidates as (
     ss.session_id,
     ss.id as session_series_id,
     ss.serie_id,
-    false as is_planned
+    (lp.serie_id is not null) as is_planned
   from public.session_series ss
+  join mine m on m.id = ss.session_id
+  left join last_planned_series lp
+    on lp.serie_id = ss.serie_id and lp.exercise_id = ss.exercise_id
   where ss.exercise_id = any(p_exercise_ids)
     and ss.completed = true
     and ss.completed_at is not null
-),
-
--- 4) unir candidatos y rankear: preferir planned (is_planned desc) y luego por completed_at desc
-all_candidates as (
-  select * from planned_candidates
-  union all
-  select * from general_candidates
-),
-
-ranked as (
-  select
-    ac.*,
-    row_number() over (partition by ac.exercise_id order by ac.is_planned desc, ac.completed_at desc) as rn
-  from all_candidates ac
 )
-
--- 5) devolver la fila top por exercise_id (rn = 1)
-select
+-- 3) top-1 por ejercicio: prefiere planificada, luego la más reciente
+select distinct on (exercise_id)
   exercise_id,
   weight_used,
   reps_performed,
@@ -232,8 +201,8 @@ select
   session_series_id,
   serie_id,
   is_planned
-from ranked
-where rn = 1;
+from candidates
+order by exercise_id, is_planned desc, completed_at desc;
 $function$
 ;
 
@@ -330,6 +299,58 @@ begin
   returning id into v_session;
 
   return v_session;
+end;
+$function$
+;
+
+-- Espejo de sql/migrations/perf_save_serie_values_rpc.sql: upsert SOLO de
+-- peso/reps (no toca completed). Lo usa updateOrCreateSessionSerie.
+CREATE OR REPLACE FUNCTION public.save_session_serie_values(
+  p_session_id uuid,
+  p_serie_id uuid,
+  p_exercise_id uuid DEFAULT NULL,
+  p_weight_used numeric DEFAULT NULL,
+  p_reps_performed integer DEFAULT NULL
+)
+ RETURNS TABLE(id uuid, session_id uuid, serie_id uuid, exercise_id uuid, completed boolean)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+declare
+  v_user uuid;
+begin
+  v_user := auth.uid()::uuid;
+
+  if not exists (select 1 from public.sessions s where s.id = p_session_id and s.user_id = v_user) then
+    raise exception 'Sesión no encontrada o no pertenece al usuario';
+  end if;
+
+  return query
+    update public.session_series ss set
+      weight_used = p_weight_used,
+      reps_performed = p_reps_performed,
+      updated_at = now()
+    where ss.session_id = p_session_id
+      and ss.serie_id is not distinct from p_serie_id
+    returning ss.id, ss.session_id, ss.serie_id, ss.exercise_id, ss.completed;
+
+  if found then return; end if;
+
+  begin
+    return query
+      insert into public.session_series(session_id, serie_id, exercise_id, weight_used, reps_performed)
+      values (p_session_id, p_serie_id, p_exercise_id, p_weight_used, p_reps_performed)
+      returning id, session_id, serie_id, exercise_id, completed;
+  exception when unique_violation then
+    return query
+      update public.session_series ss set
+        weight_used = p_weight_used,
+        reps_performed = p_reps_performed,
+        updated_at = now()
+      where ss.session_id = p_session_id
+        and ss.serie_id is not distinct from p_serie_id
+      returning ss.id, ss.session_id, ss.serie_id, ss.exercise_id, ss.completed;
+  end;
 end;
 $function$
 ;

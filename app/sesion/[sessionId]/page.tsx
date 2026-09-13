@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import {
 import { updateSerie } from "@/utils/routineUtils";
 import { normalizeMuscleGroup } from "@/lib/muscleGroups";
 import { equipmentLabel } from "@/lib/exerciseLabels";
-import { estimate1RM, getPersonalRecords } from "@/utils/progressUtils";
+import { estimate1RM, getPersonalRecords, invalidateProgressDataset } from "@/utils/progressUtils";
 import type { RoutineExerciseWithDetails, Serie, Session, SessionSerie } from "@/types/db";
 import type { SessionSummary } from "@/types/progress";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -76,10 +76,33 @@ export default function SessionPage() {
         reps: string;
     }>>({});
 
-    // Refs para debouncing
+    // Refs para debouncing y para callbacks estables (evitan recrear
+    // handleCompleteSerie en cada keystroke y lecturas stale)
     const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
+    const serieValuesRef = useRef<Record<string, { weight: string; reps: string }>>({});
+    const sessionSeriesRef = useRef<SessionSerie[]>([]);
+    const bestByExerciseRef = useRef<Record<string, number>>({});
+    const routineExercisesRef = useRef<RoutineExerciseWithDetails[]>([]);
+    serieValuesRef.current = serieValues;
+    sessionSeriesRef.current = sessionSeries;
+    bestByExerciseRef.current = bestByExercise;
+    routineExercisesRef.current = routineExercises;
 
-    // Cargar datos de la sesión
+    // Lookup O(1) de completadas + progreso memoizado (antes: .some/.filter
+    // por cada serie en cada render → lag con muchas series)
+    const completedSet = useMemo(
+        () => new Set(sessionSeries.filter((ss) => ss.completed).map((ss) => ss.serie_id)),
+        [sessionSeries]
+    );
+    const { totalSeries, completedCount, progress } = useMemo(() => {
+        const total = routineExercises.reduce((acc, re) => acc + re.series.length, 0);
+        return { totalSeries: total, completedCount: completedSet.size, progress: total > 0 ? (completedSet.size / total) * 100 : 0 };
+    }, [routineExercises, completedSet]);
+
+    // Cargar datos de la sesión: primero lo crítico (pintar), después lo
+    // secundario (últimos pesos + récords) sin bloquear el spinner.
+    // Antes: 4-5 roundtrips secuenciales (sesión → rutina → series →
+    // lastPerformed → getPersonalRecords con TODO el historial) antes de pintar.
     const loadSessionData = useCallback(async () => {
         try {
             setLoading(true);
@@ -119,29 +142,36 @@ export default function SessionPage() {
                 });
             });
             setSerieValues(initialValues);
+            // Pintar ya: lo crítico está listo. Lo secundario carga en
+            // background sin retener el spinner.
+            setLoading(false);
 
-            // Construir lista de exercise ids a consultar:
-            const idsFromRoutine = transformedRoutineExercises
-                .map((re) => re.exercise?.id)
-                .filter(Boolean) as string[];
+            // Secundario en background: últimos pesos + mejores marcas.
+            // No se awaita en el flujo crítico; cada uno actualiza su estado al llegar.
+            void (async () => {
+                const idsFromRoutine = transformedRoutineExercises
+                    .map((re) => re.exercise?.id)
+                    .filter(Boolean) as string[];
+                const idsFromSeries = sessionSeriesArr
+                    .map((ss: SessionSerie) => ss.exercise_id)
+                    .filter(Boolean) as string[];
+                const allIds = Array.from(new Set([...idsFromRoutine, ...idsFromSeries]));
 
-            const idsFromSeries = sessionSeriesArr
-                .map((ss: SessionSerie) => ss.exercise_id)
-                .filter(Boolean) as string[];
+                type LastRow = { exercise_id: string | null; weight_used: number | null; reps_performed: number | null; completed_at: string | null };
+                const [lastRes, recordsRes] = await Promise.allSettled([
+                    (allIds.length > 0
+                        ? getLastPerformedByExerciseIds(allIds)
+                        : Promise.resolve([] as LastRow[])) as Promise<LastRow[]>,
+                    getPersonalRecords(sessionObj.user_id),
+                ]);
 
-            const allIds = Array.from(new Set([...idsFromRoutine, ...idsFromSeries]));
-
-            if (allIds.length > 0) {
-                try {
-                    const lastRows: { exercise_id: string | null; weight_used: number | null; reps_performed: number | null; completed_at: string | null }[] = await getLastPerformedByExerciseIds(allIds);
-                    // lastRows puede ser [] o un array de filas con exercise_id, weight_used, reps_performed, completed_at
+                if (lastRes.status === "fulfilled") {
                     const mapLast: Record<string, {
                         weight_used: number | null;
                         reps_performed: number | null;
                         completed_at: string | null;
                     }> = {};
-
-                    (lastRows || []).forEach((r) => {
+                    (lastRes.value || []).forEach((r: LastRow) => {
                         if (!r || !r.exercise_id) return;
                         mapLast[r.exercise_id] = {
                             weight_used: r.weight_used ?? null,
@@ -149,26 +179,19 @@ export default function SessionPage() {
                             completed_at: r.completed_at ? String(r.completed_at) : null
                         };
                     });
-
                     setLastPerformedByExercise(mapLast);
-                } catch (err) {
-                    console.error("Error fetching last performed by exercises:", err);
+                } else {
+                    console.error("Error fetching last performed by exercises:", lastRes.reason);
                 }
-            } else {
-                // limpiar si no hay ids
-                setLastPerformedByExercise({});
-            }
 
-            // Mejores marcas históricas (incluye lo ya completado hoy;
-            // la comparación exige superar estrictamente, así que sigue siendo correcta)
-            try {
-                const records = await getPersonalRecords(sessionObj.user_id);
-                const bests: Record<string, number> = {};
-                for (const r of records) bests[r.exerciseId] = r.bestE1rm;
-                setBestByExercise(bests);
-            } catch {
-                setBestByExercise({});
-            }
+                if (recordsRes.status === "fulfilled") {
+                    const bests: Record<string, number> = {};
+                    for (const r of recordsRes.value) bests[r.exerciseId] = r.bestE1rm;
+                    setBestByExercise(bests);
+                } else {
+                    setBestByExercise({});
+                }
+            })();
 
         } catch (error) {
             console.error("Error cargando sesión:", error);
@@ -185,12 +208,10 @@ export default function SessionPage() {
         }
     }, [sessionId, loadSessionData]);
 
-    // Verificar si una serie está completada
-    const isSerieCompleted = (serieId: string) => {
-        return sessionSeries.some(
-            (ss) => ss.serie_id === serieId && ss.completed
-        );
-    };
+    // Verificar si una serie está completada (O(1) vía Set memoizado)
+    const isSerieCompleted = useCallback((serieId: string) => {
+        return completedSet.has(serieId);
+    }, [completedSet]);
 
     // Actualizar valores de serie en tiempo real con debouncing
     const updateSerieValueInDB = useCallback(async (
@@ -259,27 +280,72 @@ export default function SessionPage() {
         });
     }, [updateSerieValueInDB]);
 
-    // Completar/descompletar serie
-    // dentro de tu componente SessionPage (reemplazar la función existente)
+    // Completar/descompletar serie con UI OPTIMISTA: pinta al instante y
+    // sincroniza en background con 1 RPC. Antes esperaba 1-2 roundtrips
+    // secuenciales antes de actualizar el estado → cada tap tardaba.
     const handleCompleteSerie = useCallback(async (
         serie: Serie,
         exerciseId: string,
         completed: boolean
     ) => {
-        try {
-            // 1) cancelar cualquier timer pendiente para esta serie
-            if (debounceTimers.current[serie.id]) {
-                clearTimeout(debounceTimers.current[serie.id]);
-                delete debounceTimers.current[serie.id];
+        // 1) cancelar cualquier timer pendiente para esta serie
+        if (debounceTimers.current[serie.id]) {
+            clearTimeout(debounceTimers.current[serie.id]);
+            delete debounceTimers.current[serie.id];
+        }
+
+        // 2) leer los valores actuales vía ref (callback estable, sin stale closure)
+        const current = serieValuesRef.current[serie.id] || { weight: '', reps: '' };
+        const weight = current.weight ? parseFloat(current.weight) : null;
+        const reps = current.reps ? parseInt(current.reps) : null;
+        const now = new Date().toISOString();
+        const prevEntry = sessionSeriesRef.current.find(ss => ss.serie_id === serie.id);
+
+        // 3) update optimista inmediato (la UI responde sin esperar red)
+        const optimisticEntry = {
+            id: prevEntry?.id ?? `local-${serie.id}`,
+            session_id: sessionId,
+            serie_id: serie.id,
+            exercise_id: exerciseId,
+            weight_used: weight,
+            reps_performed: reps,
+            completed,
+            completed_at: completed ? now : null,
+            started_at: prevEntry?.started_at ?? null,
+            created_at: prevEntry?.created_at ?? now,
+            updated_at: now,
+            metadata: prevEntry?.metadata ?? null,
+        } as SessionSerie;
+        setSessionSeries(prev => {
+            const existing = prev.find(ss => ss.serie_id === serie.id);
+            if (existing) {
+                return prev.map(ss => ss.serie_id === serie.id ? optimisticEntry : ss);
             }
+            return [...prev, optimisticEntry];
+        });
 
-            // 2) leer los valores actuales desde el estado (no usar setState para leer)
-            const current = serieValues[serie.id] || { weight: '', reps: '' };
-            const weight = current.weight ? parseFloat(current.weight) : null;
-            const reps = current.reps ? parseInt(current.reps) : null;
+        // 4) feedback inmediato: descanso + posible récord
+        if (completed) {
+            startRestTimer(DEFAULT_REST_SECONDS);
+            const e1rm = estimate1RM(weight, reps);
+            const prevBest = bestByExerciseRef.current[exerciseId];
+            if (e1rm != null && prevBest != null && e1rm > prevBest) {
+                const exName =
+                    routineExercisesRef.current.find((re) => re.series.some((s) => s.id === serie.id))?.exercise.name ??
+                    "Ejercicio";
+                toast.success(`¡Nuevo récord en ${exName}!`, {
+                    description: `1RM estimado: ${e1rm} kg (antes ${prevBest} kg)`,
+                    duration: 6000,
+                    icon: <Trophy className="h-5 w-5 text-amber-500" />,
+                });
+                setBestByExercise((prev) => ({ ...prev, [exerciseId]: e1rm }));
+            }
+        } else {
+            stopRestTimer();
+        }
 
-            // 3) llamar al backend y esperar la respuesta
-            // completeSessionSerie debe devolver la fila creada/actualizada (ideal)
+        // 5) sincronizar en background (1 RPC atómico); rollback si falla
+        try {
             const updatedSessionSerie = await completeSessionSerie(
                 sessionId,
                 serie.id,
@@ -289,108 +355,31 @@ export default function SessionPage() {
                 completed
             );
 
-            // 4) actualizar el estado local usando el resultado del backend cuando sea posible
-            setSessionSeries(prev => {
-                const existing = prev.find(ss => ss.serie_id === serie.id);
-
-                // Si el backend devolvió una fila, úsala (más fiable)
-                if (updatedSessionSerie && updatedSessionSerie.id) {
-                    if (existing) {
-                        return prev.map(ss => ss.serie_id === serie.id
-                            ? {
-                                ...ss,
-                                // mezclar valores devueltos por backend y valores locales
-                                weight_used: updatedSessionSerie.weight_used ?? weight,
-                                reps_performed: updatedSessionSerie.reps_performed ?? reps,
-                                completed: typeof updatedSessionSerie.completed !== 'undefined' ? updatedSessionSerie.completed : completed,
-                                completed_at: updatedSessionSerie.completed_at ?? (completed ? new Date().toISOString() : null),
-                                updated_at: updatedSessionSerie.updated_at ?? new Date().toISOString(),
-                            }
-                            : ss
-                        );
-                    } else {
-                        // agregar la fila devuelta por backend (mapeando campos para SessionSerie)
-                        return [
-                            ...prev,
-                            {
-                                id: updatedSessionSerie.id,
-                                session_id: updatedSessionSerie.session_id ?? sessionId,
-                                serie_id: serie.id,
-                                exercise_id: exerciseId,
-                                weight_used: updatedSessionSerie.weight_used ?? weight,
-                                reps_performed: updatedSessionSerie.reps_performed ?? reps,
-                                completed: typeof updatedSessionSerie.completed !== 'undefined' ? updatedSessionSerie.completed : completed,
-                                completed_at: updatedSessionSerie.completed_at ?? (completed ? new Date().toISOString() : null),
-                                started_at: updatedSessionSerie.started_at ?? null,
-                                created_at: updatedSessionSerie.created_at ?? new Date().toISOString(),
-                                updated_at: updatedSessionSerie.updated_at ?? new Date().toISOString(),
-                            } as SessionSerie
-                        ];
+            // Reconciliar id real del backend (por si era fila nueva optimista)
+            if (updatedSessionSerie && updatedSessionSerie.id) {
+                setSessionSeries(prev => prev.map(ss => ss.serie_id === serie.id
+                    ? {
+                        ...ss,
+                        id: updatedSessionSerie.id,
+                        weight_used: updatedSessionSerie.weight_used ?? weight,
+                        reps_performed: updatedSessionSerie.reps_performed ?? reps,
+                        completed: typeof updatedSessionSerie.completed !== 'undefined' ? updatedSessionSerie.completed : completed,
+                        completed_at: updatedSessionSerie.completed_at ?? (completed ? now : null),
+                        updated_at: updatedSessionSerie.updated_at ?? now,
                     }
-                }
-
-                // Si backend NO devolvió fila (fallback), actualizamos con los valores que tenemos
-                if (existing) {
-                    return prev.map(ss => ss.serie_id === serie.id
-                        ? {
-                            ...ss,
-                            weight_used: weight,
-                            reps_performed: reps,
-                            completed,
-                            completed_at: completed ? new Date().toISOString() : null,
-                            updated_at: new Date().toISOString(),
-                        }
-                        : ss
-                    );
-                } else {
-                    return [
-                        ...prev,
-                        {
-                            id: `local-${serie.id}-${Date.now()}`, // id temporal si backend no devolvió
-                            session_id: sessionId,
-                            serie_id: serie.id,
-                            exercise_id: exerciseId,
-                            weight_used: weight,
-                            reps_performed: reps,
-                            completed,
-                            completed_at: completed ? new Date().toISOString() : null,
-                            started_at: null,
-                            created_at: new Date().toISOString(),
-                            updated_at: new Date().toISOString(),
-                        } as SessionSerie
-                    ];
-                }
-            });
-
-            // Celebrar récord en vivo al completar una serie que supera la mejor marca
-            if (completed) {
-                const e1rm = estimate1RM(weight, reps);
-                const prevBest = bestByExercise[exerciseId];
-                if (e1rm != null && prevBest != null && e1rm > prevBest) {
-                    const exName =
-                        routineExercises.find((re) => re.series.some((s) => s.id === serie.id))?.exercise.name ??
-                        "Ejercicio";
-                    toast.success(`¡Nuevo récord en ${exName}!`, {
-                        description: `1RM estimado: ${e1rm} kg (antes ${prevBest} kg)`,
-                        duration: 6000,
-                        icon: <Trophy className="h-5 w-5 text-amber-500" />,
-                    });
-                    setBestByExercise((prev) => ({ ...prev, [exerciseId]: e1rm }));
-                }
+                    : ss
+                ));
             }
-
-            // Descanso automático al completar (se detiene al desmarcar)
-            if (completed) {
-                startRestTimer(DEFAULT_REST_SECONDS);
-            } else {
-                stopRestTimer();
-            }
-
         } catch (error) {
             console.error("Error completando serie:", error);
+            // Rollback al estado previo
+            setSessionSeries(prev => {
+                if (!prevEntry) return prev.filter(ss => ss.serie_id !== serie.id);
+                return prev.map(ss => ss.serie_id === serie.id ? prevEntry : ss);
+            });
             toast.error("Error al completar la serie");
         }
-    }, [sessionId, serieValues, routineExercises, bestByExercise, startRestTimer, stopRestTimer]);
+    }, [sessionId, startRestTimer, stopRestTimer]);
 
 
     // Limpiar timers al desmontar
@@ -401,19 +390,13 @@ export default function SessionPage() {
         };
     }, []);
 
-    // Calcular progreso
-    const calculateProgress = () => {
-        const totalSeries = routineExercises.reduce((acc, re) => acc + re.series.length, 0);
-        const completedSeries = sessionSeries.filter((ss) => ss.completed).length;
-        return totalSeries > 0 ? (completedSeries / totalSeries) * 100 : 0;
-    };
-
     // Finalizar sesión y mostrar resumen
     const handleFinishSession = async () => {
         try {
             setFinishing(true);
             stopRestTimer();
             const result = await finishSession(sessionId);
+            if (session?.user_id) invalidateProgressDataset(session.user_id);
             setSession((prev) => (prev ? { ...prev, status: "finished" } : prev));
             setSummary(result);
         } catch (error) {
@@ -430,6 +413,7 @@ export default function SessionPage() {
             setCancelling(true);
             stopRestTimer();
             await cancelSession(sessionId);
+            if (session?.user_id) invalidateProgressDataset(session.user_id);
             router.push("/rutinas");
         } catch (error) {
             console.error("Error cancelando sesión:", error);
@@ -545,9 +529,6 @@ export default function SessionPage() {
         );
     }
 
-    const progress = calculateProgress();
-    const totalSeries = routineExercises.reduce((acc, re) => acc + re.series.length, 0);
-
     return (
         <div className="min-h-screen bg-slate-50 pb-20">
             {/* Header fijo */}
@@ -575,7 +556,7 @@ export default function SessionPage() {
                         <div className="flex justify-between text-sm">
                             <span className="text-slate-600">Progreso</span>
                             <span className="font-semibold text-slate-900">
-                                {sessionSeries.filter((ss) => ss.completed).length} /{" "}
+                                {completedCount} /{" "}
                                 {totalSeries}{" "}
                                 series
                             </span>
@@ -594,8 +575,8 @@ export default function SessionPage() {
             <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
                 {routineExercises.map((routineExercise, idx) => {
                     const totalExerciseSeries = routineExercise.series.length;
-                    const exerciseCompletedSeries = sessionSeries.filter((ss) =>
-                        ss.exercise_id == routineExercise.exercise.id && ss.completed
+                    const exerciseCompletedSeries = routineExercise.series.filter((s) =>
+                        completedSet.has(s.id)
                     ).length;
                     const exerciseProgress = totalExerciseSeries > 0
                         ? (exerciseCompletedSeries / totalExerciseSeries) * 100

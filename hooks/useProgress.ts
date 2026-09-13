@@ -10,6 +10,7 @@ import {
   getTrainedExercises,
   getVolumeHistory,
   getWeeklyStreak,
+  invalidateProgressDataset,
 } from "@/utils/progressUtils";
 import type {
   DaySessionDetail,
@@ -190,6 +191,7 @@ export function useProgressOverview(userId: string | undefined, range: ProgressR
 
   const refresh = useCallback(async () => {
     if (!userId) return;
+    invalidateProgressDataset(userId);
     setLoadingMuscles(true);
     setLoadingActivity(true);
     try {

@@ -47,26 +47,75 @@ export function sessionDayKey(s: SessionRow): string | null {
   return dayKeyFromISO(sessionDateISO(s));
 }
 
-// Dedup de peticiones concurrentes idénticas (un mount dispara varios
-// hooks en paralelo). Solo comparte vuelos en curso: al terminar se olvida,
-// así que navegaciones posteriores traen datos frescos.
-const sessionsInflight = new Map<string, Promise<SessionRow[]>>();
-const seriesInflight = new Map<string, Promise<SeriesRow[]>>();
+// Dataset único de progreso por usuario: sesiones + series completadas +
+// catálogo implicado, en UNA ráfaga. Antes cada hook hacía sus propios
+// 2-3 queries (hasta ~10 roundtrips al montar /progreso) aunque todos
+// descargaban lo mismo y filtraban por rango en cliente.
+// Caché corta (30s) + dedup de vuelos concurrentes + invalidación explícita
+// al finalizar/cancelar una sesión (invalidateProgressDataset).
+export type ProgressDataset = {
+  sessions: SessionRow[];
+  series: SeriesRow[];
+  exerciseById: Map<string, ExerciseRow>;
+};
 
-async function getSessions(userId: string, since: Date | null): Promise<SessionRow[]> {
-  const key = `${userId}|${since ? since.getTime() : "all"}`;
-  const existing = sessionsInflight.get(key);
+const DATASET_TTL_MS = 30_000;
+const datasetCache = new Map<string, { at: number; data: ProgressDataset }>();
+const datasetInflight = new Map<string, Promise<ProgressDataset>>();
+
+export function invalidateProgressDataset(userId?: string) {
+  if (userId) {
+    datasetCache.delete(userId);
+    datasetInflight.delete(userId);
+  } else {
+    datasetCache.clear();
+    datasetInflight.clear();
+  }
+}
+
+async function getProgressDataset(userId: string): Promise<ProgressDataset> {
+  const hit = datasetCache.get(userId);
+  if (hit && Date.now() - hit.at < DATASET_TTL_MS) return hit.data;
+  const existing = datasetInflight.get(userId);
   if (existing) return existing;
-  const pending = fetchSessions(userId, since).finally(() => {
-    if (sessionsInflight.get(key) === pending) sessionsInflight.delete(key);
-  });
-  sessionsInflight.set(key, pending);
+  const pending = fetchProgressDataset(userId).then(
+    (data) => {
+      if (datasetInflight.get(userId) === pending) {
+        datasetInflight.delete(userId);
+        datasetCache.set(userId, { at: Date.now(), data });
+      }
+      return data;
+    },
+    (err: unknown) => {
+      if (datasetInflight.get(userId) === pending) datasetInflight.delete(userId);
+      throw err;
+    }
+  );
+  datasetInflight.set(userId, pending);
   return pending;
 }
 
-async function fetchSessions(userId: string, since: Date | null): Promise<SessionRow[]> {
+async function fetchProgressDataset(userId: string): Promise<ProgressDataset> {
+  const sessions = await fetchSessions(userId);
+  const sessionIds = sessions.map((s) => String(s.id));
+  const series = await fetchCompletedSeries(sessionIds);
+  const exIds = [...new Set(series.map(exerciseIdOf).filter((x): x is string => !!x))];
+  let exerciseById = new Map<string, ExerciseRow>();
+  if (exIds.length > 0) {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("exercises")
+      .select("id,name,muscle")
+      .in("id", exIds.slice(0, 500));
+    if (error) throw error;
+    exerciseById = new Map(((data ?? []) as ExerciseRow[]).map((e) => [String(e.id), e]));
+  }
+  return { sessions, series, exerciseById };
+}
+
+async function fetchSessions(userId: string): Promise<SessionRow[]> {
   const supabase = await createClient();
-  const q = supabase.from("sessions").select("*").eq("user_id", userId).order("date", { ascending: false }).limit(1000);
+  const q = supabase.from("sessions").select("id,user_id,routine_id,date,created_at,started_at").eq("user_id", userId).order("date", { ascending: false }).limit(1000);
   // Si la columna date no existe en algún entorno, el order fallaría; reintentamos sin order.
   const { data: initialData, error: initialError } = await q;
   let data = initialData;
@@ -75,28 +124,11 @@ async function fetchSessions(userId: string, since: Date | null): Promise<Sessio
     if (retry.error) throw retry.error;
     data = retry.data;
   }
-  const rows = (data ?? []) as SessionRow[];
-  if (!since) return rows;
-  return rows.filter((s) => {
-    const iso = sessionDateISO(s);
-    if (!iso) return false;
-    return new Date(iso).getTime() >= since.getTime();
-  });
-}
-
-async function getCompletedSeries(sessionIds: string[]): Promise<SeriesRow[]> {
-  if (sessionIds.length === 0) return [];
-  const key = [...sessionIds].sort().join(",");
-  const existing = seriesInflight.get(key);
-  if (existing) return existing;
-  const pending = fetchCompletedSeries(sessionIds).finally(() => {
-    if (seriesInflight.get(key) === pending) seriesInflight.delete(key);
-  });
-  seriesInflight.set(key, pending);
-  return pending;
+  return ((data ?? []) as SessionRow[]);
 }
 
 async function fetchCompletedSeries(sessionIds: string[]): Promise<SeriesRow[]> {
+  if (sessionIds.length === 0) return [];
   const supabase = await createClient();
   // En lotes para evitar URLs largar con .in()
   const chunks: string[][] = [];
@@ -105,7 +137,7 @@ async function fetchCompletedSeries(sessionIds: string[]): Promise<SeriesRow[]> 
   for (const chunk of chunks) {
     const { data, error } = await supabase
       .from("session_series")
-      .select("*")
+      .select("session_id,exercise_id,weight_used,reps_performed")
       .in("session_id", chunk)
       .eq("completed", true)
       .limit(5000);
@@ -113,6 +145,16 @@ async function fetchCompletedSeries(sessionIds: string[]): Promise<SeriesRow[]> 
     out.push(...((data ?? []) as SeriesRow[]));
   }
   return out;
+}
+
+// Filtra sesiones por rango en cliente (el dataset siempre es completo).
+function sessionsInRange(sessions: SessionRow[], since: Date | null): SessionRow[] {
+  if (!since) return sessions;
+  return sessions.filter((s) => {
+    const iso = sessionDateISO(s);
+    if (!iso) return false;
+    return new Date(iso).getTime() >= since.getTime();
+  });
 }
 
 function sessionIdOf(r: SeriesRow): string | null {
@@ -135,17 +177,11 @@ function repsOf(r: SeriesRow): number | null {
 // ---------- API pública (Columna A: todo calculado en cliente) ----------
 
 export async function getTrainedExercises(userId: string): Promise<TrainedExercise[]> {
-  const sessions = await getSessions(userId, null);
+  const { sessions, series, exerciseById } = await getProgressDataset(userId);
   const byId = new Map<string, SessionRow>(sessions.map((s) => [String(s.id), s]));
-  const series = await getCompletedSeries([...byId.keys()]);
 
   const ids = [...new Set(series.map(exerciseIdOf).filter((x): x is string => !!x))];
   if (ids.length === 0) return [];
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("exercises").select("*").in("id", ids.slice(0, 200));
-  if (error) throw error;
-  const exById = new Map<string, ExerciseRow>(((data ?? []) as ExerciseRow[]).map((e) => [String(e.id), e]));
 
   // sesiones distintas por ejercicio + última fecha
   const agg = new Map<string, { sessions: Set<string>; last: string | null }>();
@@ -163,8 +199,8 @@ export async function getTrainedExercises(userId: string): Promise<TrainedExerci
   return [...agg.entries()]
     .map(([id, a]) => ({
       id,
-      name: String(exById.get(id)?.name ?? "Ejercicio"),
-      muscle: (exById.get(id)?.muscle as string | null) ?? null,
+      name: String(exerciseById.get(id)?.name ?? "Ejercicio"),
+      muscle: (exerciseById.get(id)?.muscle as string | null) ?? null,
       sessionsCount: a.sessions.size,
       lastDate: a.last,
     }))
@@ -177,10 +213,9 @@ export async function getExerciseHistory(
   range: ProgressRangeKey
 ): Promise<ExerciseHistoryPoint[]> {
   const since = rangeToSince(range);
-  const sessions = await getSessions(userId, since);
-  const byId = new Map<string, SessionRow>(sessions.map((s) => [String(s.id), s]));
-  const series = await getCompletedSeries([...byId.keys()]);
-  const filtered = series.filter((r) => exerciseIdOf(r) === exerciseId);
+  const { sessions, series } = await getProgressDataset(userId);
+  const byId = new Map<string, SessionRow>(sessionsInRange(sessions, since).map((s) => [String(s.id), s]));
+  const filtered = series.filter((r) => exerciseIdOf(r) === exerciseId && byId.has(String(sessionIdOf(r))));
 
   // Mejor serie por sesión (mayor e1RM, fallback volumen)
   const bestBySession = new Map<string, ExerciseHistoryPoint>();
@@ -213,26 +248,16 @@ export async function getMuscleDistribution(
   range: ProgressRangeKey
 ): Promise<MuscleSlice[]> {
   const since = rangeToSince(range);
-  const sessions = await getSessions(userId, since);
-  const byId = new Map<string, SessionRow>(sessions.map((s) => [String(s.id), s]));
-  const sessionIds = [...byId.keys()];
-  const series = await getCompletedSeries(sessionIds);
-  if (series.length === 0) return [];
-
-  const supabase = await createClient();
-  const exIds = [...new Set(series.map(exerciseIdOf).filter((x): x is string => !!x))].slice(0, 300);
-  let muscleByEx = new Map<string, string | null>();
-  if (exIds.length > 0) {
-    const { data, error } = await supabase.from("exercises").select("id,muscle").in("id", exIds);
-    if (error) throw error;
-    muscleByEx = new Map(((data ?? []) as ExerciseRow[]).map((e) => [String(e.id), (e.muscle as string | null) ?? null]));
-  }
+  const { sessions, series, exerciseById } = await getProgressDataset(userId);
+  const byId = new Map<string, SessionRow>(sessionsInRange(sessions, since).map((s) => [String(s.id), s]));
+  const inRange = series.filter((r) => byId.has(String(sessionIdOf(r))));
+  if (inRange.length === 0) return [];
 
   const agg = new Map<string, MuscleSlice & { sessionSet: Set<string> }>();
-  for (const r of series) {
+  for (const r of inRange) {
     const exId = exerciseIdOf(r);
     const sId = sessionIdOf(r);
-    const group = normalizeMuscleGroup(exId ? muscleByEx.get(exId) ?? null : null);
+    const group = normalizeMuscleGroup(exId ? exerciseById.get(exId)?.muscle ?? null : null);
     if (!group) continue;
     if (!agg.has(group)) agg.set(group, { group, series: 0, volume: 0, sessions: 0, sessionSet: new Set() });
     const a = agg.get(group)!;
@@ -248,20 +273,13 @@ export async function getMuscleDistribution(
     .sort((a, b) => b.series - a.series);
 }
 
-export async function getTrainingDays(userId: string, range: ProgressRangeKey = "all"): Promise<TrainingDay[]> {
-  const since = range === "all" ? null : rangeToSince(range);
-  const sessions = await getSessions(userId, since);
+function computeTrainingDays(sessions: SessionRow[], series: SeriesRow[]): TrainingDay[] {
   if (sessions.length === 0) return [];
 
   // Solo días con al menos 1 serie completada si hay datos; si no, todas las sesiones.
   let completedSet: Set<string> | null = null;
-  try {
-    const series = await getCompletedSeries(sessions.map((s) => String(s.id)));
-    if (series.length > 0) {
-      completedSet = new Set(series.map(sessionIdOf).filter((x): x is string => !!x).map(String));
-    }
-  } catch {
-    completedSet = null;
+  if (series.length > 0) {
+    completedSet = new Set(series.map(sessionIdOf).filter((x): x is string => !!x).map(String));
   }
 
   const byDay = new Map<string, number>();
@@ -276,31 +294,37 @@ export async function getTrainingDays(userId: string, range: ProgressRangeKey = 
     .sort((a, b) => (a.date < b.date ? -1 : 1));
 }
 
+export async function getTrainingDays(userId: string, range: ProgressRangeKey = "all"): Promise<TrainingDay[]> {
+  const since = range === "all" ? null : rangeToSince(range);
+  const { sessions, series } = await getProgressDataset(userId);
+  const inRange = sessionsInRange(sessions, since);
+  const rangeIds = new Set(inRange.map((s) => String(s.id)));
+  return computeTrainingDays(inRange, series.filter((r) => rangeIds.has(String(sessionIdOf(r)))));
+}
+
 export async function getWeeklyStreak(userId: string): Promise<StreakInfo> {
   const days = await getTrainingDays(userId, "all");
   return calcWeeklyStreak(days.map((d) => d.date));
 }
 
 export async function getProgressSummary(userId: string) {
-  const [days, sessions90] = await Promise.all([
-    getTrainingDays(userId, "all"),
-    getSessions(userId, rangeToSince("30d")),
-  ]);
+  const { sessions, series } = await getProgressDataset(userId);
+  const days = computeTrainingDays(sessions, series);
+  const since30 = rangeToSince("30d");
+  const sessionsLast30 = sessionsInRange(sessions, since30).length;
   const streak = calcWeeklyStreak(days.map((d) => d.date));
   return {
-    totalSessions: (await getSessions(userId, null)).length,
-    sessionsLast30: sessions90.length,
+    totalSessions: sessions.length,
+    sessionsLast30,
     activeDays: days.length,
     streak,
   };
 }
 
-export async function getDaySessions(userId: string, dayKey: string): Promise<DaySessionDetail[]> {  const sessions = await getSessions(userId, null);
+export async function getDaySessions(userId: string, dayKey: string): Promise<DaySessionDetail[]> {
+  const { sessions, series } = await getProgressDataset(userId);
   const daySessions = sessions.filter((s) => sessionDayKey(s) === dayKey);
   if (daySessions.length === 0) return [];
-
-  const ids = daySessions.map((s) => String(s.id));
-  const series = await getCompletedSeries(ids);
 
   const supabase = await createClient();
   const routineIds = [...new Set(daySessions.map((s) => s.routine_id).filter(Boolean))].map(String);
@@ -337,9 +361,8 @@ export async function getDaySessions(userId: string, dayKey: string): Promise<Da
 
 export async function getVolumeHistory(userId: string, range: ProgressRangeKey): Promise<VolumePoint[]> {
   const since = rangeToSince(range);
-  const sessions = await getSessions(userId, since);
-  const byId = new Map<string, SessionRow>(sessions.map((s) => [String(s.id), s]));
-  const series = await getCompletedSeries([...byId.keys()]);
+  const { sessions, series } = await getProgressDataset(userId);
+  const byId = new Map<string, SessionRow>(sessionsInRange(sessions, since).map((s) => [String(s.id), s]));
 
   const byDay = new Map<string, { volume: number; sessions: Set<string> }>();
   for (const r of series) {
@@ -361,24 +384,9 @@ export async function getVolumeHistory(userId: string, range: ProgressRangeKey):
 }
 
 export async function getPersonalRecords(userId: string): Promise<PersonalRecord[]> {
-  const sessions = await getSessions(userId, null);
+  const { sessions, series, exerciseById } = await getProgressDataset(userId);
   const byId = new Map<string, SessionRow>(sessions.map((s) => [String(s.id), s]));
-  const series = await getCompletedSeries([...byId.keys()]);
   if (series.length === 0) return [];
-
-  const supabase = await createClient();
-  const exIds = [...new Set(series.map(exerciseIdOf).filter((x): x is string => !!x))].slice(0, 300);
-  let nameByEx = new Map<string, { name: string; muscle: string | null }>();
-  if (exIds.length > 0) {
-    const { data, error } = await supabase.from("exercises").select("id,name,muscle").in("id", exIds);
-    if (error) throw error;
-    nameByEx = new Map(
-      ((data ?? []) as ExerciseRow[]).map((e) => [
-        String(e.id),
-        { name: String(e.name ?? "Ejercicio"), muscle: (e.muscle as string | null) ?? null },
-      ])
-    );
-  }
 
   const best = new Map<string, PersonalRecord>();
   for (const r of series) {
@@ -395,8 +403,8 @@ export async function getPersonalRecords(userId: string): Promise<PersonalRecord
     if (!prev || e1rm > prev.bestE1rm) {
       best.set(exId, {
         exerciseId: exId,
-        name: nameByEx.get(exId)?.name ?? "Ejercicio",
-        muscle: nameByEx.get(exId)?.muscle ?? null,
+        name: String(exerciseById.get(exId)?.name ?? "Ejercicio"),
+        muscle: (exerciseById.get(exId)?.muscle as string | null) ?? null,
         bestE1rm: e1rm,
         bestWeight: w,
         bestReps: reps,

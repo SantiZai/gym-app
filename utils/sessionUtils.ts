@@ -65,9 +65,12 @@ export async function getSessionData(sessionId: string) {
   }
 
   // Obtener los ejercicios de la rutina con sus series planificadas
-  const { data: routineExercises, error: exercisesError } = await supabase
-    .from("routine_exercises")
-    .select(`
+  // y las session_series ya completadas EN PARALELO (antes eran secuenciales:
+  // 3 roundtrips encadenados solo para pintar la pantalla).
+  const [exercisesRes, sessionSeriesRes] = await Promise.all([
+    supabase
+      .from("routine_exercises")
+      .select(`
       id,
       orden,
       notes,
@@ -88,17 +91,18 @@ export async function getSessionData(sessionId: string) {
         notes
       )
     `)
-    .eq("routine_id", session.routine_id)
-    .order("orden", { ascending: true });
+      .eq("routine_id", session.routine_id)
+      .order("orden", { ascending: true }),
+    supabase
+      .from("session_series")
+      .select("id,session_id,serie_id,exercise_id,weight_used,reps_performed,completed,started_at,completed_at,created_at,updated_at")
+      .eq("session_id", sessionId),
+  ]);
 
+  const { data: routineExercises, error: exercisesError } = exercisesRes;
   if (exercisesError) throw exercisesError;
 
-  // Obtener las session_series ya completadas
-  const { data: sessionSeries, error: sessionSeriesError } = await supabase
-    .from("session_series")
-    .select("*")
-    .eq("session_id", sessionId);
-
+  const { data: sessionSeries, error: sessionSeriesError } = sessionSeriesRes;
   if (sessionSeriesError) throw sessionSeriesError;
 
   return {
@@ -108,7 +112,11 @@ export async function getSessionData(sessionId: string) {
   };
 }
 
-// Actualizar o crear session_serie sin carreras:
+// Actualizar o crear session_serie sin carreras.
+// Fast path: si solo trae peso/reps (tipeo con debounce) usa el RPC
+// save_session_serie_values en 1 llamada atómica que NO toca completed.
+// (record_or_update_series no sirve aquí: pisa completed=true por default.)
+// Fallback legacy si el RPC no existe aún en la DB:
 // 1) intenta update (caso común), 2) si no había fila inserta,
 // 3) si el insert choca con otro guardado concurrente (409 por la unique
 // parcial uq_session_series_sessionid_serieid) reintenta el update.
@@ -125,6 +133,47 @@ export async function updateOrCreateSessionSerie(
     completed_at?: string | null;
   }
 ) {
+  const keys = Object.keys(data);
+  if (keys.length > 0 && keys.every((k) => k === "weight_used" || k === "reps_performed")) {
+    try {
+      const supabase = await createClient();
+      const now = new Date().toISOString();
+      const { data: rpcData, error } = await supabase.rpc("save_session_serie_values", {
+        p_session_id: sessionId,
+        p_serie_id: serieId,
+        p_exercise_id: exerciseId,
+        p_weight_used: data.weight_used ?? null,
+        p_reps_performed: data.reps_performed ?? null,
+      });
+      if (error) throw error;
+      const row = (Array.isArray(rpcData) ? rpcData[0] : rpcData) as {
+        id?: string;
+        session_id?: string;
+        serie_id?: string | null;
+        exercise_id?: string | null;
+        completed?: boolean;
+      } | null | undefined;
+      if (row?.id) {
+        return {
+          id: row.id,
+          session_id: row.session_id ?? sessionId,
+          serie_id: row.serie_id ?? serieId,
+          exercise_id: row.exercise_id ?? exerciseId,
+          weight_used: data.weight_used ?? null,
+          reps_performed: data.reps_performed ?? null,
+          completed: row.completed ?? false,
+          completed_at: null,
+          started_at: null,
+          created_at: now,
+          updated_at: now,
+          metadata: null,
+        } as SessionSerie;
+      }
+    } catch {
+      // RPC ausente o error: cae al upsert legacy de abajo
+    }
+  }
+
   const supabase = await createClient();
   const payload = {
     session_id: sessionId,
@@ -171,7 +220,10 @@ export async function updateOrCreateSessionSerie(
   }
 }
 
-// Marcar serie como completada
+// Marcar serie como completada en UNA sola llamada RPC atómica.
+// Antes: update (1) + insert (2) secuenciales → 400-1500ms por tap.
+// Usa record_or_update_series (ya existe en la DB, SECURITY DEFINER) con
+// fallback al upsert cliente si el RPC no está disponible.
 export async function completeSessionSerie(
   sessionId: string,
   serieId: string,
@@ -181,6 +233,42 @@ export async function completeSessionSerie(
   completed: boolean,
 ) {
   const now = new Date().toISOString();
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("record_or_update_series", {
+      p_session_id: sessionId,
+      p_serie_id: serieId,
+      p_exercise_id: exerciseId,
+      p_weight_used: weightUsed,
+      p_reps_performed: repsPerformed,
+      p_completed: completed,
+      p_completed_at: completed ? now : null,
+    });
+    if (error) throw error;
+    const row = (Array.isArray(data) ? data[0] : data) as {
+      id?: string;
+      session_id?: string;
+      serie_id?: string;
+      exercise_id?: string;
+    } | null | undefined;
+    if (row?.id) {
+      return {
+        id: row.id,
+        session_id: row.session_id ?? sessionId,
+        serie_id: row.serie_id ?? serieId,
+        exercise_id: row.exercise_id ?? exerciseId,
+        weight_used: weightUsed,
+        reps_performed: repsPerformed,
+        completed,
+        completed_at: completed ? now : null,
+        started_at: null,
+        created_at: now,
+        updated_at: now,
+      } as SessionSerie;
+    }
+  } catch {
+    // cae al upsert legacy de abajo
+  }
   return updateOrCreateSessionSerie(sessionId, serieId, exerciseId, {
     weight_used: weightUsed,
     reps_performed: repsPerformed,
