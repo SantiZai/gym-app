@@ -10,6 +10,7 @@ export interface User {
     name: string | null;
     avatar_url: string | null;
     unit: UnitSystem | null;
+    gym_id: string | null; // null = sin gimnasio (v2)
     created_at: string;
     updated_at: string;
     last_login: string | null;
@@ -26,6 +27,7 @@ export interface Routine {
     public: boolean;
     category: string | null;
     is_template: boolean;
+    gym_id: string | null; // seteado = biblioteca del gym (v2)
     created_at: string;
     updated_at: string;
 }
@@ -93,4 +95,61 @@ export interface RoutineExerciseWithDetails {
     notes: string | null;
     exercise: Exercise;
     series: Serie[];
+}
+
+// v2: gimnasios
+export type GymMemberRole = "owner" | "admin" | "member";
+
+export interface Gym {
+    id: string;
+    name: string;
+    description: string | null;
+    logo_url: string | null;
+    primary_color: string | null; // hex #RRGGBB, null = default app
+    phone: string | null;
+    email: string | null;
+    instagram: string | null;
+    website: string | null;
+    address: string | null;
+    maps_url: string | null;
+    latitude: number | null; // coords del buscador de lugares (null = solo texto)
+    longitude: number | null;
+    created_by: string | null;
+    created_at: string;
+}
+
+export interface GymMember {
+    gym_id: string;
+    user_id: string;
+    role: GymMemberRole;
+    joined_at: string;
+}
+
+// Horario semanal de un profesor: [{day: 0-6 (0=domingo), start: "08:00", end: "12:00"}]
+export interface TrainerScheduleEntry {
+    day: number;
+    start: string;
+    end: string;
+}
+
+export interface GymTrainer {
+    id: string;
+    gym_id: string;
+    user_id: string;
+    specialty: string | null;
+    schedule: TrainerScheduleEntry[];
+    created_at: string;
+}
+
+// Profesor con datos de su perfil público (vista public_profiles)
+export interface GymTrainerWithProfile extends GymTrainer {
+    name: string;
+    avatar_url: string | null;
+}
+
+// Miembro con datos de perfil público
+export interface GymMemberWithProfile extends GymMember {
+    name: string;
+    avatar_url: string | null;
+    is_trainer: boolean;
 }

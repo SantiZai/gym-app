@@ -4,24 +4,22 @@ import { cn } from "@/lib/utils";
 export const CAFECITO_URL = "https://cafecito.app/santizaidan";
 
 /**
- * Botón compacto y poco intrusivo para la navbar (desktop).
- * Muestra solo el icono en pantallas md y agrega el texto desde lg.
+ * Fila para el dropdown del usuario (desktop): va sobre "Información personal".
+ * Estilo de item de menú con acento ámbar.
  */
-export function CafecitoNavbarButton({ className }: { className?: string }) {
+export function CafecitoDropdownItem({ onClick }: { onClick?: () => void }) {
   return (
     <a
       href={CAFECITO_URL}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={onClick}
       title="¿Te gusta la app? Invitame un café"
       aria-label="¿Te gusta la app? Invitame un café"
-      className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900 transition-colors duration-200 hover:bg-amber-100 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-200/70 dark:hover:bg-amber-900/40",
-        className
-      )}
+      className="flex items-center space-x-3 px-4 py-3 transition-colors duration-200 hover:bg-amber-50 dark:hover:bg-amber-950/30"
     >
-      <Coffee className="h-3.5 w-3.5 shrink-0" aria-hidden />
-      <span className="hidden whitespace-nowrap lg:inline">Invitame un café</span>
+      <Coffee className="h-4 w-4 text-amber-700 dark:text-amber-200/70" aria-hidden />
+      <span className="text-sm font-medium text-amber-900 dark:text-amber-100/80">Invitame un café</span>
     </a>
   );
 }

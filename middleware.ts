@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
 
 // Rutas que requieren sesión. Sin usuario redirigen a /login.
-const PROTECTED_PREFIXES = ["/rutinas", "/progreso", "/perfil", "/comunidad", "/sesion"];
+const PROTECTED_PREFIXES = ["/rutinas", "/progreso", "/perfil", "/comunidad", "/sesion", "/gimnasios"];
 // Páginas de auth: si ya hay sesión, van al inicio.
 const AUTH_PAGES = ["/login", "/register"];
 

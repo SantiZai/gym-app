@@ -11,6 +11,21 @@
 --   get_last_performed_by_exercises_by_last_planned_series: en uso por la app.
 -- - save_session_serie_values: en uso (tipeo peso/reps, updateOrCreateSessionSerie).
 --   Ver sql/migrations/perf_save_serie_values_rpc.sql.
+-- - v2 gyms (FASE 0): is_gym_member, is_gym_admin, create_gym, join_gym,
+--   leave_gym, manage_gym_member, manage_gym_trainer, __copy_routine_to_user,
+--   fork_gym_routine, assign_gym_routine. Espejos de
+--   sql/migrations/v2_gyms_{core,trainers,routines}.sql (la app los usa
+--   desde Fase 1; el storage vive en v2_gyms_storage.sql).
+--   Incluye fix create_gym (fix_create_gym_missing_created_by.sql).
+--   Ubicación obligatoria: ver sql/migrations/v2_gyms_location.sql
+--   (trigger trg_gyms_require_location + create_gym exige p_address).
+--   Coordenadas: ver sql/migrations/v2_gyms_coordinates.sql
+--   (gyms.latitude/longitude + create_gym acepta p_latitude/p_longitude).
+-- - v2 gyms FASE 1 (sql/migrations/v2_gyms_phase1.sql): gyms.primary_color,
+--   is_gym_manager (owner/admin o profe), add_gym_member_by_email,
+--   create_gym_routine, publish_routine_to_gym, delete_gym_routine,
+--   assign_gym_routine ahora permite profe, manage_gym_member permite
+--   expulsar al profe. RLS manager para biblioteca del gym.
 -- - finish_session: en uso; incluye fix 42702 de
 --   sql/migrations/fix_finish_session_ambiguous.sql (aplicar en DB).
 -- - finish_session, record_or_update_series y get_last_performed_by_exercises:
@@ -354,3 +369,485 @@ begin
 end;
 $function$
 ;
+
+-- ==================== v2 GYMS · FASE 0 ====================
+-- Espejo de sql/migrations/v2_gyms_core.sql
+CREATE OR REPLACE FUNCTION public.is_gym_member(p_gym_id uuid)
+RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.gym_members gm
+    WHERE gm.gym_id = p_gym_id AND gm.user_id = auth.uid()
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_gym_admin(p_gym_id uuid)
+RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.gym_members gm
+    WHERE gm.gym_id = p_gym_id AND gm.user_id = auth.uid()
+      AND gm.role IN ('owner', 'admin')
+  );
+$$;
+
+-- v2 FASE 2: gating + auto-profe (espejo de v2_gym_creation_approval.sql)
+CREATE OR REPLACE FUNCTION public.is_app_admin()
+RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND u.is_app_admin = true
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.can_current_user_create_gym()
+RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users u
+    WHERE u.id = auth.uid() AND (u.is_app_admin = true OR u.can_create_gym = true)
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.approve_gym_creator(p_email text)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $function$
+declare
+  v_target uuid;
+  v_email text := lower(trim(coalesce(p_email, '')));
+begin
+  IF NOT public.is_app_admin() THEN
+    RAISE EXCEPTION 'Solo el administrador de la plataforma puede habilitar creadores';
+  END IF;
+  IF v_email = '' OR v_email NOT LIKE '%@%' THEN
+    RAISE EXCEPTION 'Email inválido';
+  END IF;
+  SELECT u.id INTO v_target FROM public.users u WHERE lower(u.email) = v_email;
+  IF v_target IS NULL THEN
+    RAISE EXCEPTION 'Ningún usuario registrado con ese email (debe crear su cuenta primero)';
+  END IF;
+  UPDATE public.users SET can_create_gym = true WHERE id = v_target;
+  RETURN v_target;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.revoke_gym_creator(p_email text)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $function$
+declare
+  v_target uuid;
+  v_email text := lower(trim(coalesce(p_email, '')));
+begin
+  IF NOT public.is_app_admin() THEN
+    RAISE EXCEPTION 'Solo el administrador de la plataforma puede revocar';
+  END IF;
+  SELECT u.id INTO v_target FROM public.users u WHERE lower(u.email) = v_email;
+  IF v_target IS NULL THEN RAISE EXCEPTION 'Usuario no encontrado'; END IF;
+  UPDATE public.users SET can_create_gym = false WHERE id = v_target;
+  RETURN v_target;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.list_gym_creator_approvals()
+RETURNS TABLE(user_id uuid, email text, name text, can_create_gym boolean, gym_id uuid)
+LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT u.id, u.email, u.name, u.can_create_gym, u.gym_id
+  FROM public.users u
+  WHERE public.is_app_admin() = true
+    AND u.can_create_gym = true
+  ORDER BY u.email;
+$$;
+
+CREATE OR REPLACE FUNCTION public.create_gym(
+  p_name text,
+  p_description text DEFAULT NULL,
+  p_phone text DEFAULT NULL,
+  p_email text DEFAULT NULL,
+  p_instagram text DEFAULT NULL,
+  p_website text DEFAULT NULL,
+  p_address text DEFAULT NULL,
+  p_maps_url text DEFAULT NULL,
+  p_latitude double precision DEFAULT NULL,
+  p_longitude double precision DEFAULT NULL
+)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $function$
+declare
+  v_user uuid := auth.uid()::uuid;
+  v_gym uuid;
+  v_is_admin boolean;
+  v_can_create boolean;
+begin
+  IF v_user IS NULL THEN RAISE EXCEPTION 'No autenticado'; END IF;
+  IF coalesce(trim(p_name), '') = '' THEN RAISE EXCEPTION 'El nombre es requerido'; END IF;
+  IF coalesce(trim(coalesce(p_address, '')), '') = '' THEN
+    RAISE EXCEPTION 'La ubicación del gimnasio es obligatoria (dirección)';
+  END IF;
+
+  SELECT u.is_app_admin, u.can_create_gym INTO v_is_admin, v_can_create
+  FROM public.users u WHERE u.id = v_user;
+
+  IF NOT coalesce(v_is_admin, false) AND NOT coalesce(v_can_create, false) THEN
+    RAISE EXCEPTION 'No tenés permiso para crear gimnasio. Solicitá el alta por mail y el admin te habilitará.';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM public.gyms g WHERE g.created_by = v_user) THEN
+    RAISE EXCEPTION 'Ya creaste un gimnasio (máximo 1 por usuario)';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.gym_members gm WHERE gm.user_id = v_user) THEN
+    RAISE EXCEPTION 'Ya pertenecés a un gimnasio (no podés crear otro)';
+  END IF;
+
+  INSERT INTO public.gyms(name, description, phone, email, instagram, website, address, maps_url, created_by, latitude, longitude)
+  VALUES (p_name, NULLIF(p_description, ''), NULLIF(p_phone, ''), NULLIF(p_email, ''),
+          NULLIF(p_instagram, ''), NULLIF(p_website, ''), NULLIF(trim(p_address), ''), NULLIF(p_maps_url, ''), v_user,
+          p_latitude, p_longitude)
+  RETURNING id INTO v_gym;
+
+  INSERT INTO public.gym_members(gym_id, user_id, role)
+  VALUES (v_gym, v_user, 'owner')
+  ON CONFLICT DO NOTHING;
+
+  INSERT INTO public.gym_trainers(gym_id, user_id, specialty, schedule)
+  VALUES (v_gym, v_user, NULL, '[]'::jsonb)
+  ON CONFLICT (gym_id, user_id) DO NOTHING;
+
+  UPDATE public.users SET gym_id = v_gym, can_create_gym = false WHERE id = v_user;
+  RETURN v_gym;
+end;
+$function$;
+
+-- Espejo de sql/migrations/v2_gyms_location.sql
+CREATE OR REPLACE FUNCTION public.validate_gym_location()
+RETURNS trigger LANGUAGE plpgsql AS $function$
+begin
+  IF coalesce(trim(NEW.address), '') = '' OR char_length(trim(NEW.address)) < 3 THEN
+    RAISE EXCEPTION 'La ubicación del gimnasio es obligatoria (dirección)';
+  END IF;
+  RETURN NEW;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.join_gym(p_gym_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $function$
+declare
+  v_user uuid := auth.uid()::uuid;
+begin
+  IF v_user IS NULL THEN RAISE EXCEPTION 'No autenticado'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.gyms g WHERE g.id = p_gym_id) THEN
+    RAISE EXCEPTION 'Gimnasio no encontrado';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.gym_members gm
+             WHERE gm.user_id = v_user AND gm.gym_id <> p_gym_id) THEN
+    RAISE EXCEPTION 'Ya pertenecés a otro gimnasio (salí primero para cambiarte)';
+  END IF;
+
+  INSERT INTO public.gym_members(gym_id, user_id, role)
+  VALUES (p_gym_id, v_user, 'member')
+  ON CONFLICT DO NOTHING;
+
+  UPDATE public.users SET gym_id = p_gym_id WHERE id = v_user;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.leave_gym()
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $function$
+declare
+  v_user uuid := auth.uid()::uuid;
+  v_gym uuid;
+  v_role text;
+begin
+  IF v_user IS NULL THEN RAISE EXCEPTION 'No autenticado'; END IF;
+  SELECT gm.gym_id, gm.role INTO v_gym, v_role
+  FROM public.gym_members gm WHERE gm.user_id = v_user LIMIT 1;
+  IF v_gym IS NULL THEN RETURN; END IF;
+
+  IF v_role = 'owner' THEN
+    RAISE EXCEPTION 'El dueño no puede salir del gimnasio: eliminalo desde Editar';
+  END IF;
+
+  DELETE FROM public.gym_members WHERE gym_id = v_gym AND user_id = v_user;
+  DELETE FROM public.gym_trainers WHERE gym_id = v_gym AND user_id = v_user;
+  UPDATE public.users SET gym_id = NULL WHERE id = v_user AND gym_id = v_gym;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.manage_gym_member(
+  p_gym_id uuid, p_user_id uuid, p_action text
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $function$
+declare
+  v_caller uuid := auth.uid()::uuid;
+  v_caller_role text;
+  v_target_role text;
+  v_caller_is_trainer boolean;
+begin
+  SELECT gm.role INTO v_caller_role FROM public.gym_members gm
+  WHERE gm.gym_id = p_gym_id AND gm.user_id = v_caller;
+  SELECT EXISTS (
+    SELECT 1 FROM public.gym_trainers gt
+    WHERE gt.gym_id = p_gym_id AND gt.user_id = v_caller
+  ) INTO v_caller_is_trainer;
+
+  SELECT gm.role INTO v_target_role FROM public.gym_members gm
+  WHERE gm.gym_id = p_gym_id AND gm.user_id = p_user_id;
+  IF v_target_role IS NULL THEN RAISE EXCEPTION 'Ese usuario no es miembro'; END IF;
+  IF v_target_role = 'owner' THEN RAISE EXCEPTION 'No se puede modificar al dueño'; END IF;
+
+  IF p_action = 'remove' THEN
+    IF NOT (
+      v_caller_role IN ('owner', 'admin') OR v_caller_is_trainer
+    ) THEN
+      RAISE EXCEPTION 'Solo administradores o profesores del gimnasio';
+    END IF;
+    IF v_target_role = 'admin' AND v_caller_role NOT IN ('owner', 'admin') THEN
+      RAISE EXCEPTION 'Solo administradores pueden expulsar a otro admin';
+    END IF;
+    DELETE FROM public.gym_members WHERE gym_id = p_gym_id AND user_id = p_user_id;
+    DELETE FROM public.gym_trainers WHERE gym_id = p_gym_id AND user_id = p_user_id;
+    UPDATE public.users SET gym_id = NULL WHERE id = p_user_id AND gym_id = p_gym_id;
+  ELSIF p_action = 'make_admin' THEN
+    IF v_caller_role IS NULL OR v_caller_role NOT IN ('owner', 'admin') THEN
+      RAISE EXCEPTION 'Solo administradores del gimnasio';
+    END IF;
+    UPDATE public.gym_members SET role = 'admin'
+    WHERE gym_id = p_gym_id AND user_id = p_user_id;
+  ELSIF p_action = 'remove_admin' THEN
+    IF v_caller_role <> 'owner' THEN RAISE EXCEPTION 'Solo el dueño puede degradar admins'; END IF;
+    UPDATE public.gym_members SET role = 'member'
+    WHERE gym_id = p_gym_id AND user_id = p_user_id;
+  ELSE
+    RAISE EXCEPTION 'Acción inválida: %', p_action;
+  END IF;
+end;
+$function$;
+
+-- Espejo de sql/migrations/v2_gyms_trainers.sql
+CREATE OR REPLACE FUNCTION public.manage_gym_trainer(
+  p_gym_id uuid,
+  p_user_id uuid,
+  p_action text,
+  p_specialty text DEFAULT NULL,
+  p_schedule jsonb DEFAULT '[]'
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $function$
+begin
+  IF NOT public.is_gym_admin(p_gym_id) THEN
+    RAISE EXCEPTION 'Solo administradores del gimnasio';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.gym_members gm
+    WHERE gm.gym_id = p_gym_id AND gm.user_id = p_user_id
+  ) THEN
+    RAISE EXCEPTION 'Solo un miembro del gimnasio puede ser profesor';
+  END IF;
+
+  IF p_action = 'add' THEN
+    IF p_schedule IS NULL OR jsonb_typeof(p_schedule) <> 'array' THEN
+      RAISE EXCEPTION 'Horarios inválidos';
+    END IF;
+    INSERT INTO public.gym_trainers(gym_id, user_id, specialty, schedule)
+    VALUES (p_gym_id, p_user_id, NULLIF(p_specialty, ''), p_schedule)
+    ON CONFLICT (gym_id, user_id)
+    DO UPDATE SET specialty = EXCLUDED.specialty, schedule = EXCLUDED.schedule;
+  ELSIF p_action = 'remove' THEN
+    DELETE FROM public.gym_trainers WHERE gym_id = p_gym_id AND user_id = p_user_id;
+  ELSE
+    RAISE EXCEPTION 'Acción inválida: %', p_action;
+  END IF;
+end;
+$function$;
+
+-- Espejo de sql/migrations/v2_gyms_routines.sql
+CREATE OR REPLACE FUNCTION public.__copy_routine_to_user(
+  p_routine_id uuid, p_target_user uuid
+)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $function$
+declare
+  v_src public.routines%ROWTYPE;
+  v_new_routine uuid;
+  v_re record;
+  v_new_re uuid;
+  v_s record;
+begin
+  SELECT * INTO v_src FROM public.routines WHERE id = p_routine_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Rutina no encontrada'; END IF;
+
+  INSERT INTO public.routines(user_id, name, description, public, category)
+  VALUES (p_target_user, v_src.name, v_src.description, false, v_src.category)
+  RETURNING id INTO v_new_routine;
+
+  FOR v_re IN SELECT * FROM public.routine_exercises
+              WHERE routine_id = p_routine_id ORDER BY orden LOOP
+    INSERT INTO public.routine_exercises(routine_id, exercise_id, orden, notes)
+    VALUES (v_new_routine, v_re.exercise_id, v_re.orden, v_re.notes)
+    RETURNING id INTO v_new_re;
+
+    FOR v_s IN SELECT * FROM public.series
+               WHERE routine_exercise_id = v_re.id ORDER BY orden LOOP
+      INSERT INTO public.series(routine_exercise_id, type, reps, weight, orden, notes)
+      VALUES (v_new_re, v_s.type, v_s.reps, v_s.weight, v_s.orden, v_s.notes);
+    END LOOP;
+  END LOOP;
+
+  RETURN v_new_routine;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.fork_gym_routine(p_routine_id uuid)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $function$
+declare
+  v_user uuid := auth.uid()::uuid;
+  v_gym uuid;
+begin
+  SELECT r.gym_id INTO v_gym FROM public.routines r WHERE r.id = p_routine_id;
+  IF v_gym IS NULL THEN RAISE EXCEPTION 'No es una rutina de gimnasio'; END IF;
+  IF NOT public.is_gym_member(v_gym) THEN
+    RAISE EXCEPTION 'Solo miembros del gimnasio';
+  END IF;
+  RETURN public.__copy_routine_to_user(p_routine_id, v_user);
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.assign_gym_routine(p_routine_id uuid, p_member_id uuid)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $function$
+declare
+  v_gym uuid;
+begin
+  SELECT r.gym_id INTO v_gym FROM public.routines r WHERE r.id = p_routine_id;
+  IF v_gym IS NULL THEN RAISE EXCEPTION 'No es una rutina de gimnasio'; END IF;
+  IF NOT public.is_gym_manager(v_gym) THEN
+    RAISE EXCEPTION 'Solo administradores o profesores del gimnasio';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.gym_members gm
+    WHERE gm.gym_id = v_gym AND gm.user_id = p_member_id
+  ) THEN
+    RAISE EXCEPTION 'El destino no es miembro del gimnasio';
+  END IF;
+  RETURN public.__copy_routine_to_user(p_routine_id, p_member_id);
+end;
+$function$;
+
+-- ==================== v2 GYMS · FASE 1 ====================
+-- Espejo de sql/migrations/v2_gyms_phase1.sql
+CREATE OR REPLACE FUNCTION public.is_gym_manager(p_gym_id uuid)
+RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT public.is_gym_admin(p_gym_id)
+      OR EXISTS (
+        SELECT 1 FROM public.gym_trainers gt
+        WHERE gt.gym_id = p_gym_id AND gt.user_id = auth.uid()
+      );
+$$;
+
+CREATE OR REPLACE FUNCTION public.add_gym_member_by_email(p_gym_id uuid, p_email text)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $function$
+declare
+  v_target uuid;
+  v_email text := lower(trim(coalesce(p_email, '')));
+begin
+  IF NOT public.is_gym_manager(p_gym_id) THEN
+    RAISE EXCEPTION 'Solo administradores o profesores del gimnasio';
+  END IF;
+  IF v_email = '' OR v_email NOT LIKE '%@%' THEN
+    RAISE EXCEPTION 'Email inválido';
+  END IF;
+
+  SELECT u.id INTO v_target FROM public.users u WHERE lower(u.email) = v_email;
+  IF v_target IS NULL THEN
+    RAISE EXCEPTION 'Ningún usuario registrado con ese email (debe crear su cuenta primero)';
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM public.gym_members gm
+             WHERE gm.user_id = v_target AND gm.gym_id <> p_gym_id) THEN
+    RAISE EXCEPTION 'Ese usuario ya pertenece a otro gimnasio';
+  END IF;
+
+  INSERT INTO public.gym_members(gym_id, user_id, role)
+  VALUES (p_gym_id, v_target, 'member')
+  ON CONFLICT DO NOTHING;
+
+  UPDATE public.users SET gym_id = p_gym_id WHERE id = v_target;
+  RETURN v_target;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.create_gym_routine(
+  p_gym_id uuid,
+  p_name text,
+  p_description text DEFAULT NULL,
+  p_category text DEFAULT NULL
+)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $function$
+declare
+  v_user uuid := auth.uid()::uuid;
+  v_new uuid;
+begin
+  IF v_user IS NULL THEN RAISE EXCEPTION 'No autenticado'; END IF;
+  IF NOT public.is_gym_manager(p_gym_id) THEN
+    RAISE EXCEPTION 'Solo administradores o profesores del gimnasio';
+  END IF;
+  IF coalesce(trim(p_name), '') = '' THEN
+    RAISE EXCEPTION 'El nombre es requerido';
+  END IF;
+
+  INSERT INTO public.routines(user_id, name, description, public, category, gym_id)
+  VALUES (v_user, trim(p_name), NULLIF(trim(coalesce(p_description, '')), ''), false,
+          NULLIF(trim(coalesce(p_category, '')), ''), p_gym_id)
+  RETURNING id INTO v_new;
+  RETURN v_new;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.publish_routine_to_gym(p_routine_id uuid, p_gym_id uuid)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $function$
+declare
+  v_user uuid := auth.uid()::uuid;
+  v_src public.routines%ROWTYPE;
+  v_new uuid;
+  v_re record;
+  v_new_re uuid;
+  v_s record;
+begin
+  IF NOT public.is_gym_manager(p_gym_id) THEN
+    RAISE EXCEPTION 'Solo administradores o profesores del gimnasio';
+  END IF;
+
+  SELECT * INTO v_src FROM public.routines WHERE id = p_routine_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Rutina no encontrada'; END IF;
+  IF v_src.gym_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Esa rutina ya es del gimnasio';
+  END IF;
+  IF v_src.user_id <> v_user AND NOT coalesce(v_src.public, false) THEN
+    RAISE EXCEPTION 'Solo podés publicar tus propias rutinas o rutinas públicas';
+  END IF;
+
+  INSERT INTO public.routines(user_id, name, description, public, category, gym_id)
+  VALUES (v_user, v_src.name, v_src.description, false, v_src.category, p_gym_id)
+  RETURNING id INTO v_new;
+
+  FOR v_re IN SELECT * FROM public.routine_exercises
+              WHERE routine_id = p_routine_id ORDER BY orden LOOP
+    INSERT INTO public.routine_exercises(routine_id, exercise_id, orden, notes)
+    VALUES (v_new, v_re.exercise_id, v_re.orden, v_re.notes)
+    RETURNING id INTO v_new_re;
+
+    FOR v_s IN SELECT * FROM public.series
+               WHERE routine_exercise_id = v_re.id ORDER BY orden LOOP
+      INSERT INTO public.series(routine_exercise_id, type, reps, weight, orden, notes)
+      VALUES (v_new_re, v_s.type, v_s.reps, v_s.weight, v_s.orden, v_s.notes);
+    END LOOP;
+  END LOOP;
+
+  RETURN v_new;
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.delete_gym_routine(p_routine_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $function$
+declare
+  v_gym uuid;
+begin
+  SELECT r.gym_id INTO v_gym FROM public.routines r WHERE r.id = p_routine_id;
+  IF v_gym IS NULL THEN RAISE EXCEPTION 'No es una rutina de gimnasio'; END IF;
+  IF NOT public.is_gym_manager(v_gym) THEN
+    RAISE EXCEPTION 'Solo administradores o profesores del gimnasio';
+  END IF;
+  DELETE FROM public.routines WHERE id = p_routine_id;
+end;
+$function$;

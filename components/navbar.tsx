@@ -7,7 +7,8 @@ import { Menu, X, User as UserIcon, LogOut, ChevronDown } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { APP_VERSION } from "@/lib/version";import { CafecitoMenuCard, CafecitoNavbarButton } from "@/components/cafecito-button";
+import { APP_VERSION } from "@/lib/version";
+import { CafecitoMenuCard, CafecitoDropdownItem } from "@/components/cafecito-button";
 import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -15,6 +16,7 @@ import Image from "next/image";
 const navLinks = [
   { href: "/", label: "Inicio" },
   { href: "/rutinas", label: "Rutinas" },
+  { href: "/gimnasios", label: "Gimnasios" },
   { href: "/comunidad", label: "Comunidad" },
   { href: "/progreso", label: "Progreso" },
   { href: "/perfil", label: "Perfil" },
@@ -156,7 +158,6 @@ export function Navbar() {
               ))}
 
               {/* Dropdown de usuario - Desktop */}
-              <CafecitoNavbarButton />
               <ThemeToggle />
               {user ? (
                 <div className="relative" ref={dropdownRef}>
@@ -187,6 +188,8 @@ export function Navbar() {
                   {/* Dropdown menu */}
                   {isDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-50">
+                      <CafecitoDropdownItem />
+                      <div className="border-t border-slate-200 my-1"></div>
                       <Link
                         href="/perfil"
                         onClick={() => setIsDropdownOpen(false)}
