@@ -73,6 +73,25 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollY, isOpen]);
 
+  // Exponer visibilidad real de la nav móvil como var CSS para que los
+  // headers sticky (ej. "Sesión en progreso") bajen/suban junto con la nav
+  // en vez de quedar tapados. En desktop la nav siempre es visible.
+  useEffect(() => {
+    const syncNavOffset = () => {
+      if (window.matchMedia("(min-width: 768px)").matches) {
+        document.documentElement.style.setProperty("--nav-top", "4rem");
+        return;
+      }
+      document.documentElement.style.setProperty(
+        "--nav-top",
+        isVisible ? "4rem" : "0rem"
+      );
+    };
+    syncNavOffset();
+    window.addEventListener("resize", syncNavOffset);
+    return () => window.removeEventListener("resize", syncNavOffset);
+  }, [isVisible]);
+
   // Prevenir scroll del body cuando el menú está abierto y asegurar que navbar sea visible
   useEffect(() => {
     if (isOpen) {

@@ -531,8 +531,11 @@ export default function SessionPage() {
 
     return (
         <div className="min-h-screen bg-slate-50 pb-20">
-            {/* Header fijo */}
-            <div className="bg-white border-b sticky top-0 z-10 shadow-sm">
+            {/* Header fijo: sigue a la nav móvil (var --nav-top) para no quedar tapado */}
+            <div
+                className="bg-white border-b sticky z-10 shadow-sm transition-[top] duration-300"
+                style={{ top: "var(--nav-top, 4rem)" }}
+            >
                 <div className="max-w-4xl mx-auto px-4 py-4">
                     <div className="flex items-center justify-between mb-3">
                         <div>
@@ -591,7 +594,7 @@ export default function SessionPage() {
                             className="bg-white rounded-lg shadow-sm border overflow-hidden"
                         >
                             {/* Header del ejercicio */}
-                            <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4 border-b">
+                            <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4 border-b border-slate-200/60 dark:border-white/10">
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-3">
@@ -637,7 +640,7 @@ export default function SessionPage() {
                             </div>
 
                             {/* Series */}
-                            <div className="divide-y divide-slate-100">
+                            <div className="divide-y divide-slate-200/60 dark:divide-white/10">
                                 {routineExercise.series.map((serie, serieIdx) => {
                                     const completed = isSerieCompleted(serie.id);
 
@@ -704,7 +707,7 @@ export default function SessionPage() {
                                                         inputMode="decimal"
                                                         ariaLabel={`Peso serie ${serieIdx + 1}`}
                                                         placeholder={serie.weight != null ? String(serie.weight) : (lastPerformed?.weight_used != null ? String(lastPerformed.weight_used) : "0")}
-                                                        inputWidthClass="w-16"
+                                                        inputWidthClass="w-20"
                                                     />
                                                     <span className="text-sm text-slate-600">kg</span>
                                                 </div>
@@ -716,7 +719,7 @@ export default function SessionPage() {
                                                         inputMode="numeric"
                                                         ariaLabel={`Repeticiones serie ${serieIdx + 1}`}
                                                         placeholder={serie.reps != null ? String(serie.reps) : (lastPerformed?.reps_performed != null ? String(lastPerformed.reps_performed) : "0")}
-                                                        inputWidthClass="w-16"
+                                                        inputWidthClass="w-20"
                                                     />
                                                     <span className="text-sm text-slate-600">reps</span>
                                                 </div>

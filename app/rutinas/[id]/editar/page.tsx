@@ -565,7 +565,7 @@ export default function EditarRutinaPage() {
                     {rutina.exercises.map((ejercicio, ejercicioIndex) => (
                         <div key={ejercicio.id} className="bg-white rounded-xl shadow-sm border border-slate-100">
                             {/* Header del ejercicio */}
-                            <div className="p-6 border-b border-slate-200">
+                            <div className="p-6 border-b border-slate-200/60 dark:border-white/10">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-4">
                                         <div className="flex flex-col space-y-1">
@@ -614,7 +614,7 @@ export default function EditarRutinaPage() {
 
                             {/* Series */}
                             <div className="p-4 sm:p-6">
-                                <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
+                                <div className="divide-y divide-slate-200/60 dark:divide-white/10 overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
                                     {/* Filas de series (deslizar en mobile para duplicar/eliminar) */}
                                     {ejercicio.series.map((serie, serieIndex) => {
                                         return (
@@ -722,7 +722,7 @@ export default function EditarRutinaPage() {
                                                             step={1}
                                                             inputMode="numeric"
                                                             ariaLabel={`Reps serie ${serieIndex + 1}`}
-                                                            inputWidthClass="w-16"
+                                                            inputWidthClass="w-20"
                                                         />
                                                         <span className="text-xs text-slate-500">reps</span>
                                                     </div>

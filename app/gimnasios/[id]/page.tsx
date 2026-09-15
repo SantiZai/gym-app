@@ -729,7 +729,7 @@ export default function GimnasioPage() {
               </p>
               </div>
             )}
-            <div className="divide-y divide-slate-100 rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+            <div className="divide-y divide-slate-200/60 dark:divide-white/10 rounded-xl bg-white shadow-sm ring-1 ring-slate-200 dark:ring-white/10">
               {members.map((m) => (
                 <div key={m.user_id} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   {m.avatar_url ? (
