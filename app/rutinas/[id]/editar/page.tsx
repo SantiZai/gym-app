@@ -32,6 +32,7 @@ import { StepperInput } from "@/components/shared/StepperInput";
 import { normalizeMuscleGroup, type MuscleGroup } from "@/lib/muscleGroups";
 import { equipmentLabel } from "@/lib/exerciseLabels";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { FilterSelect } from "@/components/shared/FilterSelect";
 import { toast } from "sonner";
 
 const TIPOS_SERIE = [
@@ -786,42 +787,27 @@ export default function EditarRutinaPage() {
                         <div className="p-4 border-b flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center w-full gap-3">
                                 <div className="w-full flex flex-col md:flex-row gap-3">
-                                    <select
+                                    <FilterSelect
                                         value={filterMuscle}
-                                        onChange={(e) => setFilterMuscle(e.target.value)}
-                                        className="px-4 py-2.5 bg-white border border-slate-200 w-full rounded-xl shadow-sm text-slate-700 font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300 cursor-pointer"
-                                    >
-                                        <option value="">Todos los músculos</option>
-                                        {musculos.map((m) => (
-                                            <option key={m} value={m}>
-                                                {m}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <select
+                                        onChange={setFilterMuscle}
+                                        allLabel="Todos los músculos"
+                                        options={musculos}
+                                        ariaLabel="Filtrar por músculo"
+                                    />
+                                    <FilterSelect
                                         value={filterType}
-                                        onChange={(e) => setFilterType(e.target.value)}
-                                        className="px-4 py-2.5 bg-white border border-slate-200 w-full rounded-xl shadow-sm text-slate-700 font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300 cursor-pointer"
-                                    >
-                                        <option value="">Todos los tipos</option>
-                                        {tipos.map((t) => (
-                                            <option key={t} value={t}>
-                                                {t}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <select
+                                        onChange={setFilterType}
+                                        allLabel="Todos los tipos"
+                                        options={tipos}
+                                        ariaLabel="Filtrar por tipo de ejercicio"
+                                    />
+                                    <FilterSelect
                                         value={filterEquipment}
-                                        onChange={(e) => setFilterEquipment(e.target.value)}
-                                        className="px-4 py-2.5 bg-white border border-slate-200 w-full rounded-xl shadow-sm text-slate-700 font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300 cursor-pointer"
-                                    >
-                                        <option value="">Todo el equipamiento</option>
-                                        {equipamientos.map((eq) => (
-                                            <option key={eq} value={eq}>
-                                                {eq}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={setFilterEquipment}
+                                        allLabel="Todo el equipamiento"
+                                        options={equipamientos}
+                                        ariaLabel="Filtrar por equipamiento"
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -838,7 +824,7 @@ export default function EditarRutinaPage() {
                                         return (
                                             <div
                                                 key={ej.id}
-                                                className={`p-3 border rounded-lg flex items-start justify-between ${ya ? "bg-blue-50 border-blue-200" : "border-slate-200"}`}
+                                                className={`p-3 border rounded-lg flex items-start justify-between ${ya ? "bg-blue-50 border-blue-200 dark:border-blue-800/40 dark:bg-blue-950/30" : "border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900"}`}
                                             >
                                                 <div className="flex-1 min-w-0 pr-3">
                                                     <h4 className="font-medium text-slate-900 break-words">{ej.name}</h4>

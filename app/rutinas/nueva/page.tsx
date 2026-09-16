@@ -8,6 +8,7 @@ import { getExercises } from "@/utils/exercisesUtils";
 import { normalizeMuscleGroup, type MuscleGroup } from "@/lib/muscleGroups";
 import { equipmentLabel } from "@/lib/exerciseLabels";
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
+import { FilterSelect } from "@/components/shared/FilterSelect";
 import { createRoutineBasic } from "@/utils/routineUtils";
 import { toast } from "sonner";
 
@@ -209,7 +210,7 @@ export default function NuevaRutinaPage() {
                                         value={rutinaNombre}
                                         onChange={(e) => setRutinaNombre(e.target.value)}
                                         placeholder="Ej: Rutina de Pecho y Tríceps"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300"
                                     />
                                 </div>
 
@@ -222,7 +223,7 @@ export default function NuevaRutinaPage() {
                                         onChange={(e) => setRutinaDescripcion(e.target.value)}
                                         placeholder="Describe tu rutina..."
                                         rows={3}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300"
                                     />
                                 </div>
 
@@ -329,45 +330,36 @@ export default function NuevaRutinaPage() {
                                             value={busqueda}
                                             onChange={(e) => setBusqueda(e.target.value)}
                                             placeholder="Buscar ejercicios..."
-                                            className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            className="w-full pl-10 pr-3 py-2 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300"
                                         />
                                     </div>
 
                                     {/* Filtro por músculo */}
-                                    <select
+                                    <FilterSelect
                                         value={filtroMusculo}
-                                        onChange={(e) => setFiltroMusculo(e.target.value)}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    >
-                                        <option value="">Todos los músculos</option>
-                                        {musculos.map(musculo => (
-                                            <option key={musculo} value={musculo}>{musculo}</option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroMusculo}
+                                        allLabel="Todos los músculos"
+                                        options={musculos}
+                                        ariaLabel="Filtrar por músculo"
+                                    />
 
                                     {/* Filtro por tipo */}
-                                    <select
+                                    <FilterSelect
                                         value={filtroTipo}
-                                        onChange={(e) => setFiltroTipo(e.target.value)}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    >
-                                        <option value="">Todos los tipos</option>
-                                        {tipos.map(tipo => (
-                                            <option key={tipo} value={tipo}>{tipo}</option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroTipo}
+                                        allLabel="Todos los tipos"
+                                        options={tipos}
+                                        ariaLabel="Filtrar por tipo de ejercicio"
+                                    />
 
                                     {/* Filtro por equipamiento */}
-                                    <select
+                                    <FilterSelect
                                         value={filtroEquipamiento}
-                                        onChange={(e) => setFiltroEquipamiento(e.target.value)}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    >
-                                        <option value="">Todo el equipamiento</option>
-                                        {equipamientos.map(equipamiento => (
-                                            <option key={equipamiento} value={equipamiento}>{equipamiento}</option>
-                                        ))}
-                                    </select>
+                                        onChange={setFiltroEquipamiento}
+                                        allLabel="Todo el equipamiento"
+                                        options={equipamientos}
+                                        ariaLabel="Filtrar por equipamiento"
+                                    />
                                 </div>
                             </div>
 
@@ -387,8 +379,8 @@ export default function NuevaRutinaPage() {
                                                 <div
                                                     key={ejercicio.id}
                                                     className={`p-4 border rounded-lg transition-all duration-200 ${yaSeleccionado
-                                                        ? 'border-blue-200 bg-blue-50'
-                                                        : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                                                        ? 'border-blue-200 bg-blue-50 dark:border-blue-800/40 dark:bg-blue-950/30'
+                                                        : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm dark:border-white/10 dark:bg-slate-900'
                                                         }`}
                                                 >
                                                     <div className="flex items-center justify-between gap-3">
