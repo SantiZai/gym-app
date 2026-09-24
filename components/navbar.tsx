@@ -98,12 +98,22 @@ export function Navbar() {
       document.body.style.overflow = "hidden";
       setIsVisible(true); // Siempre mostrar navbar cuando el menú está abierto
     } else {
-      document.body.style.overflow = "unset";
+      document.body.style.overflow = "";
     }
     return () => {
-      document.body.style.overflow = "unset";
+      document.body.style.overflow = "";
     };
   }, [isOpen]);
+
+  // Cerrar menú/dropdown al cambiar de ruta y liberar el scroll.
+  // Sin esto, si se navega con el drawer abierto (ej. logout -> redirect a "/"),
+  // el `overflow: hidden` y el overlay quedaban activos y la app parecía
+  // "trabada": no se podía navegar sin recargar.
+  useEffect(() => {
+    setIsOpen(false);
+    setIsDropdownOpen(false);
+    document.body.style.overflow = "";
+  }, [pathname]);
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
@@ -126,9 +136,13 @@ export function Navbar() {
     try {
       const supabase = await createClient();
       await supabase.auth.signOut();
-      // El hook useAuth detectará automáticamente el cambio de estado
-      // y actualizará la UI antes de navegar
-      router.push("/login");
+      setIsOpen(false);
+      setIsDropdownOpen(false);
+      document.body.style.overflow = "";
+      // Refrescar el router para limpiar el caché de RSC (con la sesión vieja
+      // los Links parecían no responder hasta recargar) y navegar duro a /login.
+      router.refresh();
+      window.location.href = "/login";
     } catch (error) {
       console.error("Error signing out:", error);
     }

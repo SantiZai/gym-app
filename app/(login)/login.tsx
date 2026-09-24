@@ -16,12 +16,22 @@ export const Login = ({ mode = "signin" }: { mode?: "signin" | "signup" }) => {
   const handleGoogleSignIn = async () => {
     const redirectTo = `${window.location.origin}/api/callback`;
     setLoading(true);
-    const supabase = await createClient();
-    supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo },
-    });
-    setLoading(false);
+    try {
+      const supabase = await createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo },
+      });
+      if (error) {
+        console.error("Error signing in with Google:", error);
+        setLoading(false);
+      }
+      // Si no hay error, Supabase redirige al provider: mantener loading
+      // hasta salir de la página (no setear false acá para no parpadear).
+    } catch (error) {
+      console.error("Error signing in with Google:", error);
+      setLoading(false);
+    }
   };
 
   const [magicLinkState, magicLinkAction, pending] = useActionState<

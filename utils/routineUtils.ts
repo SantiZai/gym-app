@@ -19,6 +19,11 @@ export async function getUserRoutines(userId: string) {
         .from("routines")
         .select("*")
         .eq("user_id", userId)
+        // Las rutinas de gimnasio (gym_id seteado) viven en la biblioteca del
+        // gym, no en "Mis Rutinas". Sin este filtro, publicar una rutina propia
+        // al gym duplicaba visualmente la rutina en la pestaña personal porque
+        // la copia del gym sigue teniendo user_id = el profesor.
+        .is("gym_id", null)
 
     if (error) throw error;
     return data;
@@ -90,6 +95,7 @@ export async function createRoutineBasic(payload: CreateRoutinePayload) {
         .from("routines")
         .select("id")
         .eq("user_id", user.id)
+        .is("gym_id", null)
         .eq("name", payload.nombre)
         .gt("created_at", since)
         .order("created_at", { ascending: false })
@@ -257,15 +263,35 @@ export async function deleteSerie(serieId: string) {
     if (error) throw error;
 }
 
-// Eliminar rutina (ejercicios, series y sesiones se eliminan en cascada)
+// Eliminar rutina PERSONAL (ejercicios, series y sesiones se eliminan en cascada)
+// Las rutinas de gimnasio (gym_id NOT NULL) NO se pueden borrar desde acá:
+// solo desde la administración del gym (deleteGymRoutine). Sin esta guarda,
+// borrar la "copia" que se veía en Mis Rutinas borraba también la del gym
+// porque era la misma fila.
 export async function deleteRoutine(routineId: string) {
     const supabase = await createClient();
-    const { error } = await supabase
+
+    const { data: existing, error: checkError } = await supabase
         .from("routines")
-        .delete()
-        .eq("id", routineId);
+        .select("id,gym_id")
+        .eq("id", routineId)
+        .maybeSingle();
+
+    if (checkError) throw checkError;
+    if (existing && (existing as { gym_id: string | null }).gym_id) {
+        throw new Error("Esta rutina es del gimnasio. Eliminala desde la administración del gimnasio.");
+    }
+
+    const { error, count } = await supabase
+        .from("routines")
+        .delete({ count: "exact" })
+        .eq("id", routineId)
+        .is("gym_id", null);
 
     if (error) throw error;
+    if (count === 0) {
+        throw new Error("No se pudo eliminar la rutina. Si es del gimnasio, eliminala desde la administración del gimnasio.");
+    }
 }
 
 // Eliminar múltiples series

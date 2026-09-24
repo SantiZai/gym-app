@@ -56,7 +56,7 @@ export default function RutinasPage() {
       setRutinas((prev) => prev.filter((r) => r.id !== id));
     } catch (error) {
       console.error("Error eliminando rutina:", error);
-      toast.error("No se pudo eliminar la rutina. Intenta nuevamente.");
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar la rutina. Intenta nuevamente.");
     } finally {
       setDeletingId(null);
       setConfirmingId(null);
