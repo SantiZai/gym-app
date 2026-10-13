@@ -12,7 +12,7 @@ export interface ExerciseHistoryPoint {
 export interface TrainedExercise {
   id: string;
   name: string;
-  muscle: string | null;
+  muscle: string | null; // slug FK a muscles (p. ej. "biceps")
   sessionsCount: number;
   lastDate: string | null;
 }
@@ -61,7 +61,7 @@ export interface VolumePoint {
 export interface PersonalRecord {
   exerciseId: string;
   name: string;
-  muscle: string | null;
+  muscle: string | null; // slug FK a muscles
   bestE1rm: number;
   bestWeight: number | null;
   bestReps: number | null;

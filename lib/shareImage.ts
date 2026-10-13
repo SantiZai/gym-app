@@ -1,6 +1,6 @@
 import type { Muscle } from "react-body-highlighter";
-import { GROUP_SLUES, intensityLevel } from "@/lib/bodyMap";
-import type { MuscleGroup } from "@/lib/muscleGroups";
+import { MUSCLE_SLUES, intensityLevel } from "@/lib/bodyMap";
+import type { MuscleSlug } from "@/lib/muscles";
 import type { DaySessionDetail, MuscleSlice } from "@/types/progress";
 
 /** Tamaño de la imagen compartida (retrato, ideal para historias/WhatsApp). */
@@ -13,19 +13,19 @@ export interface ShareModelDatum {
   frequency: number;
 }
 
-/** Misma transformación que BodyMap: rejas por grupo → datos del highlighter. */
+/** Misma transformación que BodyMap: series por músculo → datos del highlighter. */
 export function toShareModelData(muscles: MuscleSlice[]): ShareModelDatum[] {
   const maxSeries = Math.max(0, ...muscles.map((m) => m.series));
   return muscles
     .map((m) => ({
       name: m.group,
-      muscles: GROUP_SLUES[m.group as MuscleGroup] ?? [],
+      muscles: MUSCLE_SLUES[m.group as MuscleSlug] ?? [],
       frequency: intensityLevel(maxSeries > 0 ? m.series / maxSeries : 0),
     }))
     .filter((d) => d.frequency > 0 && d.muscles.length > 0);
 }
 
-/** Top de zonas por series (ya vienen ordenadas del query, se reordena por seguridad). */
+/** Top de músculos por series (ya vienen ordenadas del query, se reordena por seguridad). */
 export function topMuscleGroups(muscles: MuscleSlice[], n = 3): MuscleSlice[] {
   return [...muscles]
     .filter((m) => m.series > 0)
@@ -211,12 +211,12 @@ export async function renderShareImage(data: ShareImageData): Promise<Blob> {
   ctx.fillText(`🔥 ${streakText}`, W / 2, y);
   y += 58;
 
-  // Top zonas musculares
+  // Top músculos
   if (data.topMuscles.length > 0) {
     ctx.font = `400 32px ${FONT}`;
     ctx.fillStyle = "#cbd5e1";
     const names = data.topMuscles.map((m) => m.group).join(" · ");
-    ctx.fillText(`Zonas más trabajadas: ${names}`, W / 2, y);
+    ctx.fillText(`Músculos más trabajados: ${names}`, W / 2, y);
     y += 56;
   }
 

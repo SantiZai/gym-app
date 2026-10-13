@@ -29,7 +29,7 @@ import {
 import { getExercisesByIds, getExercises } from "@/utils/exercisesUtils";
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import { StepperInput } from "@/components/shared/StepperInput";
-import { normalizeMuscleGroup, type MuscleGroup } from "@/lib/muscleGroups";
+import { MUSCLES, muscleName } from "@/lib/muscles";
 import { equipmentLabel } from "@/lib/exerciseLabels";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { FilterSelect } from "@/components/shared/FilterSelect";
@@ -167,9 +167,9 @@ export default function EditarRutinaPage() {
             const matchesSearch =
                 !lower ||
                 e.name.toLowerCase().includes(lower) ||
-                (e.muscle ?? "").toLowerCase().includes(lower) ||
+                muscleName(e.primary_muscle_id).toLowerCase().includes(lower) ||
                 (e.instructions ?? "").toLowerCase().includes(lower);
-            const matchesMuscle = !filterMuscle || normalizeMuscleGroup(e.muscle) === filterMuscle;
+            const matchesMuscle = !filterMuscle || e.primary_muscle_id === filterMuscle;
             const matchesType = !filterType || e.type === filterType;
             const matchesEquipment = !filterEquipment || e.equipment === filterEquipment;
             return matchesSearch && matchesMuscle && matchesType && matchesEquipment;
@@ -177,7 +177,8 @@ export default function EditarRutinaPage() {
         setFilteredExercises(filtered);
     }, [allExercises, searchText, filterMuscle, filterType, filterEquipment]);
 
-    const musculos = useMemo(() => [...new Set(allExercises.map((e) => normalizeMuscleGroup(e.muscle)).filter((v): v is MuscleGroup => !!v))], [allExercises]);
+    const musculos = useMemo(() => MUSCLES.filter((m) => allExercises.some((e) => e.primary_muscle_id === m.slug)).map((m) => m.slug), [allExercises]);
+    const musculoLabels = useMemo(() => Object.fromEntries(MUSCLES.map((m) => [m.slug, `${m.name} · ${m.region}`])), []);
     const tipos = useMemo(() => [...new Set(allExercises.map((e) => e.type).filter((v): v is string => !!v))], [allExercises]);
     const equipamientos = useMemo(() => [...new Set(allExercises.map((e) => e.equipment).filter((v): v is string => !!v))], [allExercises]);
 
@@ -590,7 +591,7 @@ export default function EditarRutinaPage() {
                                                 {ejercicio.orden ?? ejercicioIndex + 1}. {ejercicio.name}
                                             </h3>
                                             <p className="text-sm text-slate-600">
-                                                {ejercicio.muscle} • {ejercicio.equipment}
+                                                {muscleName(ejercicio.primary_muscle_id)} • {ejercicio.equipment}
                                             </p>
                                         </div>
                                     </div>
@@ -792,6 +793,7 @@ export default function EditarRutinaPage() {
                                         onChange={setFilterMuscle}
                                         allLabel="Todos los músculos"
                                         options={musculos}
+                                        labels={musculoLabels}
                                         ariaLabel="Filtrar por músculo"
                                     />
                                     <FilterSelect
@@ -828,7 +830,7 @@ export default function EditarRutinaPage() {
                                             >
                                                 <div className="flex-1 min-w-0 pr-3">
                                                     <h4 className="font-medium text-slate-900 break-words">{ej.name}</h4>
-                                                    <div className="text-xs text-slate-500 mt-1">{normalizeMuscleGroup(ej.muscle) ?? ej.muscle ?? "—"} • {equipmentLabel(ej.equipment) ?? "—"}</div>
+                                                    <div className="text-xs text-slate-500 mt-1">{muscleName(ej.primary_muscle_id)} • {equipmentLabel(ej.equipment) ?? "—"}</div>
                                                     <p className="text-xs text-slate-600 mt-2 line-clamp-2 break-words">{ej.instructions}</p>
                                                 </div>
                                                 <div>

@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/navbar";
+import { ActiveSessionBanner } from "@/components/ActiveSessionBanner";
+import { InstallPrompt } from "@/components/InstallPrompt";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SonnerToaster } from "@/components/sonner-toaster";
 import { cn } from "@/lib/utils";
@@ -66,6 +69,9 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
   appleWebApp: {
     capable: true,
     title: "Habitus",
@@ -110,6 +116,9 @@ export default function RootLayout({
           <main className="pt-16">
             {children}
           </main>
+          <ActiveSessionBanner />
+          <InstallPrompt />
+          <ServiceWorkerRegister />
           <SonnerToaster />
         </ThemeProvider>
         <Analytics />

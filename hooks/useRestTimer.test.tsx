@@ -5,10 +5,12 @@ import { useRestTimer } from "./useRestTimer";
 
 beforeEach(() => {
   vi.useFakeTimers();
+  localStorage.clear();
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  localStorage.clear();
 });
 
 describe("useRestTimer", () => {
@@ -20,11 +22,12 @@ describe("useRestTimer", () => {
     unmount();
   });
 
-  it("descuenta cada segundo", () => {
+  it("descuenta por timestamp aunque los ticks se salteen (background)", () => {
     const { result, unmount } = renderHook(() => useRestTimer());
     act(() => result.current.startRestTimer(60));
-    act(() => vi.advanceTimersByTime(5000));
-    expect(result.current.restTime).toBe(55);
+    // Simula background: ningún tick por 50s, luego uno solo
+    act(() => vi.advanceTimersByTime(50000));
+    expect(result.current.restTime).toBe(10);
     expect(result.current.isRunning).toBe(true);
     unmount();
   });
@@ -45,6 +48,44 @@ describe("useRestTimer", () => {
     act(() => result.current.stopRestTimer());
     expect(result.current.restTime).toBe(0);
     expect(result.current.isRunning).toBe(false);
+    unmount();
+  });
+
+  it("retoma un descanso persistido al remontar (salir y volver)", () => {
+    const key = "habitus:rest:test-1";
+    const first = renderHook(() => useRestTimer({ storageKey: key }));
+    act(() => first.result.current.startRestTimer(90));
+    act(() => vi.advanceTimersByTime(10000));
+    first.unmount();
+
+    // 20s después se vuelve a entrar: quedan 60s
+    act(() => vi.advanceTimersByTime(20000));
+    const second = renderHook(() => useRestTimer({ storageKey: key }));
+    expect(second.result.current.isRunning).toBe(true);
+    expect(second.result.current.restTime).toBe(60);
+    second.unmount();
+  });
+
+  it("ignora un descanso persistido ya vencido", () => {
+    const key = "habitus:rest:test-2";
+    const first = renderHook(() => useRestTimer({ storageKey: key }));
+    act(() => first.result.current.startRestTimer(10));
+    first.unmount();
+    act(() => vi.advanceTimersByTime(30000));
+    const second = renderHook(() => useRestTimer({ storageKey: key }));
+    expect(second.result.current.isRunning).toBe(false);
+    expect(second.result.current.restTime).toBe(0);
+    second.unmount();
+  });
+
+  it("llama onFinish una vez al terminar", () => {
+    const onFinish = vi.fn();
+    const { result, unmount } = renderHook(() => useRestTimer({ onFinish }));
+    act(() => result.current.startRestTimer(2));
+    act(() => vi.advanceTimersByTime(2000));
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    act(() => vi.advanceTimersByTime(5000));
+    expect(onFinish).toHaveBeenCalledTimes(1);
     unmount();
   });
 

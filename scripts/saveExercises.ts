@@ -4,11 +4,12 @@ import * as dotenv from "dotenv";
 // Cargar variables de entorno
 dotenv.config({ path: '.env.local' });
 
-// Definir el tipo Exercise localmente
+// Definir el tipo Exercise localmente (músculo = slug FK a muscles)
 interface Exercise {
     id?: string;
     name: string;
-    muscle: string | null;
+    primary_muscle_id: string | null;
+    secondary_muscle_ids: string[];
     type: string | null;
     equipment: string | null;
     instructions: string | null;
@@ -90,18 +91,45 @@ interface ApiNinjaExercise {
     instructions: string;
 }
 
+// API Ninjas (inglés) → slug FK a muscles. Sin mapeo = se descarta.
+const NINJA_TO_MUSCLE: Record<string, string> = {
+    chest: "pectoral",
+    lats: "dorsal",
+    middle_back: "trapecio",
+    lower_back: "lumbares",
+    traps: "trapecio",
+    neck: "trapecio",
+    biceps: "biceps",
+    triceps: "triceps",
+    forearms: "antebrazo",
+    abdominals: "abdominales",
+    quadriceps: "cuadriceps",
+    hamstrings: "isquiotibiales",
+    glutes: "gluteos",
+    abductors: "gluteos",
+    adductors: "cuadriceps",
+    calves: "gemelos",
+};
+
+function normalizeMuscle(raw: string | null | undefined): string | null {
+    if (!raw) return null;
+    const key = raw.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[\s-]+/g, "_");
+    return NINJA_TO_MUSCLE[key] ?? null;
+}
+
 function formatExercises(exercises: ApiNinjaExercise[]) {
     return exercises.map((exercise: ApiNinjaExercise) => {
         return {
             name: exercise.name,
-            muscle: exercise.muscle,
+            primary_muscle_id: normalizeMuscle(exercise.muscle),
+            secondary_muscle_ids: [],
             type: exercise.type,
             equipment: exercise.equipment,
             instructions: `${exercise.difficulty} - ${exercise.instructions}`,
             origin: "api-ninjas",
             created_at: new Date().toISOString()
         } as Exercise
-    })
+    }).filter((e) => e.primary_muscle_id != null)
 }
 
 async function translateExercises(exercises: Exercise[]) {
@@ -111,7 +139,8 @@ async function translateExercises(exercises: Exercise[]) {
         const exercise = exercises[i];
 
         // Limpiar y validar el texto a traducir
-        const textToTranslate = `${exercise.name || ''} - ${exercise.muscle || ''} - ${exercise.type || ''} - ${exercise.equipment || ''} - ${exercise.instructions || ''}`;
+        // (el músculo se mantiene como slug: no se traduce)
+        const textToTranslate = `${exercise.name || ''} - ${exercise.type || ''} - ${exercise.equipment || ''} - ${exercise.instructions || ''}`;
 
         // Limitar la longitud del texto (EdenAI tiene límites)
         const cleanText = textToTranslate.substring(0, 1000);
@@ -146,14 +175,13 @@ async function translateExercises(exercises: Exercise[]) {
                 const translatedText = data.google.text;
                 const parts = translatedText.split(' - ');
 
-                if (parts.length >= 5) {
+                if (parts.length >= 4) {
                     const translatedExercise = {
                         ...exercise,
                         name: parts[0].trim(),
-                        muscle: parts[1].trim(),
-                        type: parts[2].trim(),
-                        equipment: parts[3].trim(),
-                        instructions: parts.slice(4).join(' - ').trim()
+                        type: parts[1].trim(),
+                        equipment: parts[2].trim(),
+                        instructions: parts.slice(3).join(' - ').trim()
                     };
                     translatedExercises.push(translatedExercise);
                     console.log(`✓ Traducido: ${exercise.name} -> ${translatedExercise.name}`);

@@ -1,5 +1,5 @@
 import { createClient } from "@/utils/supabase/client";
-import { normalizeMuscleGroup } from "@/lib/muscleGroups";
+import { isMuscleSlug, normalizeMuscle } from "@/lib/muscles";
 import { calcWeeklyStreak, dayKeyFromISO, getMonday } from "@/lib/streak";
 import type {
   DaySessionDetail,
@@ -41,6 +41,14 @@ type ExerciseRow = Record<string, any>;
 
 function sessionDateISO(s: SessionRow): string | null {
   return s.date ?? s.created_at ?? s.started_at ?? null;
+}
+
+// Músculo principal del ejercicio: prefiere la FK nueva; si viene texto
+// libre legacy lo normaliza al slug canónico.
+function exerciseMuscleSlug(e: ExerciseRow | undefined): string | null {
+  const fk = e?.primary_muscle_id as string | null | undefined;
+  if (isMuscleSlug(fk)) return fk;
+  return normalizeMuscle((e?.muscle as string | null | undefined) ?? null);
 }
 
 export function sessionDayKey(s: SessionRow): string | null {
@@ -105,7 +113,7 @@ async function fetchProgressDataset(userId: string): Promise<ProgressDataset> {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("exercises")
-      .select("id,name,muscle")
+      .select("id,name,primary_muscle_id")
       .in("id", exIds.slice(0, 500));
     if (error) throw error;
     exerciseById = new Map(((data ?? []) as ExerciseRow[]).map((e) => [String(e.id), e]));
@@ -200,7 +208,7 @@ export async function getTrainedExercises(userId: string): Promise<TrainedExerci
     .map(([id, a]) => ({
       id,
       name: String(exerciseById.get(id)?.name ?? "Ejercicio"),
-      muscle: (exerciseById.get(id)?.muscle as string | null) ?? null,
+      muscle: exerciseMuscleSlug(exerciseById.get(id)),
       sessionsCount: a.sessions.size,
       lastDate: a.last,
     }))
@@ -257,7 +265,7 @@ export async function getMuscleDistribution(
   for (const r of inRange) {
     const exId = exerciseIdOf(r);
     const sId = sessionIdOf(r);
-    const group = normalizeMuscleGroup(exId ? exerciseById.get(exId)?.muscle ?? null : null);
+    const group = exId ? exerciseMuscleSlug(exerciseById.get(exId)) : null;
     if (!group) continue;
     if (!agg.has(group)) agg.set(group, { group, series: 0, volume: 0, sessions: 0, sessionSet: new Set() });
     const a = agg.get(group)!;
@@ -404,7 +412,7 @@ export async function getPersonalRecords(userId: string): Promise<PersonalRecord
       best.set(exId, {
         exerciseId: exId,
         name: String(exerciseById.get(exId)?.name ?? "Ejercicio"),
-        muscle: (exerciseById.get(exId)?.muscle as string | null) ?? null,
+        muscle: exerciseMuscleSlug(exerciseById.get(exId)),
         bestE1rm: e1rm,
         bestWeight: w,
         bestReps: reps,

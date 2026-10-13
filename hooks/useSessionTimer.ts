@@ -48,15 +48,25 @@ export function useSessionTimer(session: SessionShape | null) {
     const initialElapsed = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
     setElapsedTime(initialElapsed);
 
-    // Usar window.setInterval que devuelve number en browsers
-    intervalIdRef.current = window.setInterval(() => {
+    const resync = () => {
       const now = Date.now();
       const elapsed = Math.max(0, Math.floor((now - startTime) / 1000));
       setElapsedTime(elapsed);
-    }, 1000);
+    };
+
+    // Usar window.setInterval que devuelve number en browsers
+    intervalIdRef.current = window.setInterval(resync, 1000);
+
+    // Al volver del background los intervals pueden venir throtteados:
+    // recalcular al instante para no mostrar tiempo congelado.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") resync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
     // Cleanup
     return () => {
+      document.removeEventListener("visibilitychange", onVisible);
       if (intervalIdRef.current !== null) {
         clearInterval(intervalIdRef.current);
         intervalIdRef.current = null;

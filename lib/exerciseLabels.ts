@@ -1,5 +1,6 @@
 // Etiquetas en español para los códigos en inglés del catálogo
-// (muscle/type/equipment vienen de API Ninjas y se guardan así en DB).
+// (type/equipment vienen de API Ninjas y se guardan así en DB;
+// el músculo es FK a muscles y se muestra con muscleName()).
 
 const EQUIPMENT_ES: Record<string, string> = {
   dumbbell: "Mancuernas",

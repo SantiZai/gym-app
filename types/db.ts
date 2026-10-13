@@ -35,7 +35,8 @@ export interface Routine {
 export interface Exercise {
     id: string;
     name: string;
-    muscle: string | null;
+    primary_muscle_id: string | null; // slug FK a muscles (p. ej. "biceps")
+    secondary_muscle_ids: string[]; // slugs FK a muscles
     type: string | null;
     equipment: string | null;
     instructions: string | null;

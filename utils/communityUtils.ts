@@ -119,7 +119,7 @@ export async function getPublicRoutineDetail(routineId: string): Promise<PublicR
         })
       );
       return {
-        exercise: ex ?? { id: re.exercise_id, name: "Ejercicio", muscle: null, type: null, equipment: null, instructions: null, origin: null, created_at: "" },
+        exercise: ex ?? { id: re.exercise_id, name: "Ejercicio", primary_muscle_id: null, secondary_muscle_ids: [], type: null, equipment: null, instructions: null, origin: null, created_at: "" },
         orden: re.orden,
         notes: re.notes,
         series,

@@ -8,26 +8,26 @@ import {
 import type { DaySessionDetail, MuscleSlice } from "@/types/progress";
 
 const MUSCLES: MuscleSlice[] = [
-  { group: "Piernas", series: 40, volume: 8000, sessions: 8 },
-  { group: "Espalda", series: 20, volume: 4000, sessions: 5 },
-  { group: "Pecho", series: 10, volume: 2000, sessions: 3 },
-  { group: "Core", series: 0, volume: 0, sessions: 0 },
+  { group: "cuadriceps", series: 40, volume: 8000, sessions: 8 },
+  { group: "dorsal", series: 20, volume: 4000, sessions: 5 },
+  { group: "pectoral", series: 10, volume: 2000, sessions: 3 },
+  { group: "abdominales", series: 0, volume: 0, sessions: 0 },
 ];
 
 describe("toShareModelData", () => {
-  it("mapea grupos a slugs con intensidad relativa al máximo", () => {
+  it("mapea músculos a slugs con intensidad relativa al máximo", () => {
     const data = toShareModelData(MUSCLES);
-    const piernas = data.find((d) => d.name === "Piernas");
-    expect(piernas?.frequency).toBe(5);
-    expect(piernas?.muscles).toContain("quadriceps");
-    const pecho = data.find((d) => d.name === "Pecho");
+    const quads = data.find((d) => d.name === "cuadriceps");
+    expect(quads?.frequency).toBe(5);
+    expect(quads?.muscles).toContain("quadriceps");
+    const pecho = data.find((d) => d.name === "pectoral");
     expect(pecho!.frequency).toBeGreaterThan(0);
     expect(pecho!.frequency).toBeLessThan(5);
   });
 
-  it("omite grupos sin series y devuelve vacío sin datos", () => {
+  it("omite músculos sin series y devuelve vacío sin datos", () => {
     const data = toShareModelData(MUSCLES);
-    expect(data.find((d) => d.name === "Core")).toBeUndefined();
+    expect(data.find((d) => d.name === "abdominales")).toBeUndefined();
     expect(toShareModelData([])).toEqual([]);
   });
 });
@@ -35,11 +35,11 @@ describe("toShareModelData", () => {
 describe("topMuscleGroups", () => {
   it("ordena por series y limita a n", () => {
     const top = topMuscleGroups(MUSCLES, 2);
-    expect(top.map((m) => m.group)).toEqual(["Piernas", "Espalda"]);
+    expect(top.map((m) => m.group)).toEqual(["cuadriceps", "dorsal"]);
   });
 
-  it("excluye grupos sin series", () => {
-    expect(topMuscleGroups(MUSCLES).find((m) => m.group === "Core")).toBeUndefined();
+  it("excluye músculos sin series", () => {
+    expect(topMuscleGroups(MUSCLES).find((m) => m.group === "abdominales")).toBeUndefined();
   });
 });
 

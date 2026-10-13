@@ -7,12 +7,12 @@ import { ChartCard } from "@/components/shared/ChartCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   BODY_BLUE_SCALE,
-  GROUP_SLUES,
-  groupOfSlug,
+  MUSCLE_SLUES,
+  muscleOfSlug,
   intensityLevel,
   rangeDescription,
 } from "@/lib/bodyMap";
-import type { MuscleGroup } from "@/lib/muscleGroups";
+import { muscleName, type MuscleSlug } from "@/lib/muscles";
 import type { MuscleSlice, ProgressRangeKey } from "@/types/progress";
 
 interface Props {
@@ -22,7 +22,7 @@ interface Props {
 }
 
 export function BodyMap({ muscles, range, loading }: Props) {
-  const [selected, setSelected] = useState<MuscleGroup | null>(null);
+  const [selected, setSelected] = useState<MuscleSlug | null>(null);
   const [mounted, setMounted] = useState(false);
   const { resolvedTheme } = useTheme();
 
@@ -42,7 +42,7 @@ export function BodyMap({ muscles, range, loading }: Props) {
       muscles
         .map((m) => ({
           name: m.group,
-          muscles: GROUP_SLUES[m.group as MuscleGroup] ?? [],
+          muscles: MUSCLE_SLUES[m.group as MuscleSlug] ?? [],
           frequency: intensityLevel(maxSeries > 0 ? m.series / maxSeries : 0),
         }))
         .filter((d) => d.frequency > 0 && d.muscles.length > 0),
@@ -55,7 +55,7 @@ export function BodyMap({ muscles, range, loading }: Props) {
   );
 
   const handleMuscleClick = ({ muscle }: { muscle: string }) => {
-    const group = groupOfSlug(muscle);
+    const group = muscleOfSlug(muscle);
     if (!group) return;
     setSelected((prev) => (prev === group ? null : group));
   };
@@ -65,14 +65,14 @@ export function BodyMap({ muscles, range, loading }: Props) {
 
   if (loading) {
     return (
-      <ChartCard title="Mapa corporal" description="Intensidad por zona muscular">
+      <ChartCard title="Mapa corporal" description="Intensidad por músculo">
         <Skeleton className="h-[280px] w-full" />
       </ChartCard>
     );
   }
 
   return (
-    <ChartCard title="Mapa corporal" description="Intensidad por zona · tocá un músculo para detallar">
+    <ChartCard title="Mapa corporal" description="Intensidad por músculo · tocá un músculo para detallar">
       <div className="mx-auto flex w-full max-w-md items-start justify-center gap-2">
         <div className="min-w-0 flex-1">
           <Model
@@ -109,7 +109,7 @@ export function BodyMap({ muscles, range, loading }: Props) {
           <p className="text-sm text-slate-500">Tocá un músculo para ver cuántas veces lo trabajaste.</p>
         ) : activeSlice ? (
           <p className="text-sm text-slate-700">
-            <span className="font-semibold text-slate-900">{activeSlice.group}</span>
+            <span className="font-semibold text-slate-900">{muscleName(activeSlice.group)}</span>
             {" · "}
             {activeSlice.sessions} {activeSlice.sessions === 1 ? "sesión" : "sesiones"}
             {" · "}
@@ -117,7 +117,7 @@ export function BodyMap({ muscles, range, loading }: Props) {
           </p>
         ) : (
           <p className="text-sm text-slate-500">
-            <span className="font-semibold text-slate-700">{selected}</span>
+            <span className="font-semibold text-slate-700">{selected ? muscleName(selected) : ""}</span>
             {" · "}sin entreno {rangeDescription(range)}
           </p>
         )}

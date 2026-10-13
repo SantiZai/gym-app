@@ -1,27 +1,41 @@
 import type { Muscle } from "react-body-highlighter";
-import type { MuscleGroup } from "./muscleGroups";
+import type { MuscleSlug } from "./muscles";
 import type { ProgressRangeKey } from "@/types/progress";
 
-/** Slugs de react-body-highlighter por zona muscular de la app. */
-export const GROUP_SLUES: Record<MuscleGroup, Muscle[]> = {
-  Pecho: ["chest"],
-  Espalda: ["trapezius", "upper-back", "lower-back"],
-  Piernas: ["quadriceps", "hamstring", "adductor", "abductors"],
-  Hombros: ["front-deltoids", "back-deltoids"],
-  Brazos: ["biceps", "triceps", "forearm"],
-  Core: ["abs", "obliques"],
-  "Glúteos": ["gluteal"],
-  Gemelos: ["calves"],
+/** Slugs de react-body-highlighter por músculo de la app. */
+export const MUSCLE_SLUES: Record<MuscleSlug, Muscle[]> = {
+  pectoral: ["chest"],
+  dorsal: ["upper-back", "lower-back"],
+  trapecio: ["trapezius"],
+  "deltoides-anterior": ["front-deltoids"],
+  "deltoides-medio": ["front-deltoids", "back-deltoids"],
+  "deltoides-posterior": ["back-deltoids"],
+  biceps: ["biceps"],
+  triceps: ["triceps"],
+  antebrazo: ["forearm"],
+  abdominales: ["abs"],
+  oblicuos: ["obliques"],
+  lumbares: ["lower-back"],
+  cuadriceps: ["quadriceps"],
+  isquiotibiales: ["hamstring"],
+  gluteos: ["gluteal"],
+  gemelos: ["calves"],
 };
 
-const SLUG_TO_GROUP: Record<string, MuscleGroup> = Object.fromEntries(
-  Object.entries(GROUP_SLUES).flatMap(([group, slugs]) =>
-    slugs.map((slug) => [slug, group as MuscleGroup])
-  )
-);
+const SLUG_TO_MUSCLE: Record<string, MuscleSlug> = {};
+for (const [muscle, slugs] of Object.entries(MUSCLE_SLUES) as [MuscleSlug, Muscle[]][]) {
+  for (const slug of slugs) {
+    // Gana el primero (orden del literal): p. ej. "front-deltoids" → deltoides-anterior.
+    SLUG_TO_MUSCLE[slug] ??= muscle;
+  }
+}
 
-export function groupOfSlug(slug: string): MuscleGroup | null {
-  return SLUG_TO_GROUP[slug] ?? null;
+// Al tocar el modelo, estas zonas ambiguas resuelven al músculo más específico.
+SLUG_TO_MUSCLE["back-deltoids"] = "deltoides-posterior";
+SLUG_TO_MUSCLE["lower-back"] = "lumbares";
+
+export function muscleOfSlug(slug: string): MuscleSlug | null {
+  return SLUG_TO_MUSCLE[slug] ?? null;
 }
 
 /** Escala de azules de la app (claro → intenso) para 5 niveles. */

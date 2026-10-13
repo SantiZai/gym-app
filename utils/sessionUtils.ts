@@ -77,7 +77,8 @@ export async function getSessionData(sessionId: string) {
       exercise:exercises (
         id,
         name,
-        muscle,
+        primary_muscle_id,
+        secondary_muscle_ids,
         type,
         equipment,
         instructions

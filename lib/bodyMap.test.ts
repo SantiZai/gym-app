@@ -1,21 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { BODY_BLUE_SCALE, GROUP_SLUES, groupOfSlug, intensityLevel, rangeDescription } from "./bodyMap";
-import { MUSCLE_GROUPS } from "./muscleGroups";
+import { BODY_BLUE_SCALE, MUSCLE_SLUES, muscleOfSlug, intensityLevel, rangeDescription } from "./bodyMap";
+import { MUSCLES } from "./muscles";
 
 describe("bodyMap", () => {
-  it("cubre las 8 zonas con slugs válidos", () => {
-    expect(Object.keys(GROUP_SLUES).sort()).toEqual([...MUSCLE_GROUPS].sort());
-    for (const slugs of Object.values(GROUP_SLUES)) {
+  it("cubre los 16 músculos con slugs válidos", () => {
+    expect(Object.keys(MUSCLE_SLUES).sort()).toEqual(MUSCLES.map((m) => m.slug).sort());
+    for (const slugs of Object.values(MUSCLE_SLUES)) {
       expect(slugs.length).toBeGreaterThan(0);
     }
   });
 
-  it("resuelve slug a zona y viceversa", () => {
-    expect(groupOfSlug("chest")).toBe("Pecho");
-    expect(groupOfSlug("upper-back")).toBe("Espalda");
-    expect(groupOfSlug("calves")).toBe("Gemelos");
-    expect(groupOfSlug("gluteal")).toBe("Glúteos");
-    expect(groupOfSlug("head")).toBeNull();
+  it("resuelve slug del modelo al músculo preciso", () => {
+    expect(muscleOfSlug("chest")).toBe("pectoral");
+    expect(muscleOfSlug("biceps")).toBe("biceps");
+    expect(muscleOfSlug("triceps")).toBe("triceps");
+    expect(muscleOfSlug("front-deltoids")).toBe("deltoides-anterior");
+    expect(muscleOfSlug("back-deltoids")).toBe("deltoides-posterior");
+    expect(muscleOfSlug("upper-back")).toBe("dorsal");
+    expect(muscleOfSlug("lower-back")).toBe("lumbares");
+    expect(muscleOfSlug("quadriceps")).toBe("cuadriceps");
+    expect(muscleOfSlug("hamstring")).toBe("isquiotibiales");
+    expect(muscleOfSlug("calves")).toBe("gemelos");
+    expect(muscleOfSlug("gluteal")).toBe("gluteos");
+    expect(muscleOfSlug("head")).toBeNull();
   });
 
   it("niveles de intensidad 0..5", () => {

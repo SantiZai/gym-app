@@ -14,9 +14,23 @@ import {
     updateOrCreateSessionSerie,
 } from "@/utils/sessionUtils";
 import { updateSerie } from "@/utils/routineUtils";
-import { normalizeMuscleGroup } from "@/lib/muscleGroups";
+import { muscleName } from "@/lib/muscles";
 import { equipmentLabel } from "@/lib/exerciseLabels";
 import { estimate1RM, getPersonalRecords, invalidateProgressDataset } from "@/utils/progressUtils";
+import { clearActiveSession, setActiveSession } from "@/lib/activeSession";
+import {
+    clearAllSerieDrafts,
+    clearSerieDraft,
+    getSerieDrafts,
+    saveSerieDraft,
+} from "@/lib/sessionDrafts";
+import {
+    clearOutboxForSession,
+    enqueueOutbox,
+    isOnline,
+    type FlushResult,
+} from "@/lib/sessionOutbox";
+import { useOnlineSync } from "@/hooks/useOnlineSync";
 import type { RoutineExerciseWithDetails, Serie, Session, SessionSerie } from "@/types/db";
 import type { SessionSummary } from "@/types/progress";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -46,19 +60,48 @@ export default function SessionPage() {
     );
     const [sessionSeries, setSessionSeries] = useState<SessionSerie[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadOffline, setLoadOffline] = useState(false);
     const [finishing, setFinishing] = useState(false);
     const [cancelling, setCancelling] = useState(false);
     const [confirmandoCancelacion, setConfirmandoCancelacion] = useState(false);
     const [summary, setSummary] = useState<SessionSummary | null>(null);
 
     const { elapsedTime, formatElapsedTime } = useSessionTimer(session);
+    const handleRestFinished = useCallback(() => {
+        try {
+            navigator.vibrate?.(200);
+        } catch {
+            // vibración no disponible
+        }
+        toast.success("Descanso terminado", { description: "A darle a la próxima serie." });
+    }, []);
     const {
         restTime,
         isRunning: resting,
         startRestTimer,
         stopRestTimer,
         formatRestTime,
-    } = useRestTimer();
+    } = useRestTimer({
+        storageKey: sessionId ? `habitus:rest:${sessionId}` : null,
+        onFinish: handleRestFinished,
+    });
+
+    // Sincronización offline: al volver la red se reproducen los cambios
+    // encolados. Si se había pedido finalizar sin conexión, acá llega el resumen.
+    const handleFlushed = useCallback((result: FlushResult) => {
+        const mine = result.finishSummaries.find((f) => f.sessionId === sessionId);
+        if (mine) {
+            clearActiveSession(sessionId);
+            clearAllSerieDrafts(sessionId);
+            setSession((prev) => (prev ? { ...prev, status: "finished" } : prev));
+            setSummary(mine.summary);
+            toast.success("Sesión sincronizada y finalizada");
+        }
+    }, [sessionId]);
+    const { online, pending, refresh: refreshPending } = useOnlineSync({
+        sessionId,
+        onFlushed: handleFlushed,
+    });
 
     // Estados para editar pesos y reps
     const [lastPerformedByExercise, setLastPerformedByExercise] = useState<Record<string, {
@@ -124,20 +167,39 @@ export default function SessionPage() {
             setRoutineExercises(transformedRoutineExercises);
             setSessionSeries(sessionSeriesArr);
 
-            // Inicializar valores de peso y reps para cada serie
+            // Registrar como sesión activa (retomar al salir y volver)
+            if (sessionObj.status !== "finished") {
+                setActiveSession({
+                    sessionId,
+                    routineId: sessionObj.routine_id ?? null,
+                    userId: sessionObj.user_id ?? null,
+                    startedAt: sessionObj.started_at ?? null,
+                });
+            }
+
+            // Inicializar valores de peso y reps para cada serie.
+            // La DB manda; si no hay nada guardado y hay borrador local
+            // (tipeo previo a salir), se restaura para no perderlo.
+            const drafts = getSerieDrafts(sessionId);
             const initialValues: Record<string, { weight: string; reps: string }> = {};
             transformedRoutineExercises.forEach((re) => {
                 re.series.forEach((serie) => {
                     const completedData = sessionSeriesArr.find(
                         (ss: SessionSerie) => ss.serie_id === serie.id && ss.completed
                     );
+                    if (completedData?.weight_used != null || completedData?.reps_performed != null) {
+                        // Hay dato real: el borrador quedó obsoleto
+                        clearSerieDraft(sessionId, serie.id);
+                    }
+                    const draft = drafts[serie.id];
+                    const hasDraft = draft != null && (draft.weight !== "" || draft.reps !== "");
                     initialValues[serie.id] = {
                         weight: completedData?.weight_used != null
                             ? String(completedData.weight_used)
-                            : serie.weight != null ? String(serie.weight) : "",
+                            : hasDraft ? draft.weight : (serie.weight != null ? String(serie.weight) : ""),
                         reps: completedData?.reps_performed != null
                             ? String(completedData.reps_performed)
-                            : serie.reps != null ? String(serie.reps) : "",
+                            : hasDraft ? draft.reps : (serie.reps != null ? String(serie.reps) : ""),
                     };
                 });
             });
@@ -195,8 +257,14 @@ export default function SessionPage() {
 
         } catch (error) {
             console.error("Error cargando sesión:", error);
-            toast.error("Error al cargar la sesión");
-            router.push("/rutinas");
+            if (!isOnline()) {
+                // Sin red no se puede traer la sesión: esperar en pantalla
+                // con reintento en vez de expulsar a /rutinas.
+                setLoadOffline(true);
+            } else {
+                toast.error("Error al cargar la sesión");
+                router.push("/rutinas");
+            }
         } finally {
             setLoading(false);
         }
@@ -228,6 +296,7 @@ export default function SessionPage() {
                 weight_used: weightNum,
                 reps_performed: repsNum,
             });
+            clearSerieDraft(sessionId, serieId);
 
             // Actualizar sessionSeries en el estado local sin recargar todo
             setSessionSeries(prev => {
@@ -244,8 +313,21 @@ export default function SessionPage() {
             });
         } catch (error) {
             console.error("Error actualizando serie:", error);
+            if (!isOnline()) {
+                // Sin conexión: queda el valor en pantalla + borrador y se encola
+                enqueueOutbox({
+                    kind: "serie-values",
+                    sessionId,
+                    serieId,
+                    exerciseId,
+                    weight: weight ? parseFloat(weight) : null,
+                    reps: reps ? parseInt(reps) : null,
+                });
+                refreshPending();
+                toast.info("Sin conexión: el cambio se sincronizará solo");
+            }
         }
-    }, [sessionId]);
+    }, [sessionId, refreshPending]);
 
     // Manejar cambio en inputs con debouncing
     const handleSerieValueChange = useCallback((
@@ -268,6 +350,9 @@ export default function SessionPage() {
                     [field]: value,
                 }
             };
+
+            // Respaldo inmediato: si se sale antes del debounce no se pierde
+            saveSerieDraft(sessionId, serieId, updatedValues[serieId].weight, updatedValues[serieId].reps);
 
             // Crear nuevo timer para actualizar en BD después de 500ms
             debounceTimers.current[serieId] = setTimeout(() => {
@@ -354,6 +439,7 @@ export default function SessionPage() {
                 reps,
                 completed
             );
+            clearSerieDraft(sessionId, serie.id);
 
             // Reconciliar id real del backend (por si era fila nueva optimista)
             if (updatedSessionSerie && updatedSessionSerie.id) {
@@ -372,6 +458,21 @@ export default function SessionPage() {
             }
         } catch (error) {
             console.error("Error completando serie:", error);
+            if (!isOnline()) {
+                // Sin conexión: se conserva el estado optimista y se encola
+                enqueueOutbox({
+                    kind: "complete-serie",
+                    sessionId,
+                    serieId: serie.id,
+                    exerciseId,
+                    weight,
+                    reps,
+                    completed,
+                });
+                refreshPending();
+                toast.info("Sin conexión: la serie se sincronizará sola");
+                return;
+            }
             // Rollback al estado previo
             setSessionSeries(prev => {
                 if (!prevEntry) return prev.filter(ss => ss.serie_id !== serie.id);
@@ -379,7 +480,7 @@ export default function SessionPage() {
             });
             toast.error("Error al completar la serie");
         }
-    }, [sessionId, startRestTimer, stopRestTimer]);
+    }, [sessionId, startRestTimer, stopRestTimer, refreshPending]);
 
 
     // Limpiar timers al desmontar
@@ -390,18 +491,58 @@ export default function SessionPage() {
         };
     }, []);
 
+    // Al ocultar la app (minimizar, cambiar de app, bloquear pantalla),
+    // forzar el guardado de lo tipeado pendiente: el debounce de 500ms
+    // no llegaría a disparar y ese cambio "se borraría de la nada".
+    useEffect(() => {
+        const flushPending = () => {
+            const pendingIds = Object.keys(debounceTimers.current);
+            if (pendingIds.length === 0) return;
+            const values = serieValuesRef.current;
+            const exercises = routineExercisesRef.current;
+            for (const serieId of pendingIds) {
+                const timer = debounceTimers.current[serieId];
+                if (timer) clearTimeout(timer);
+                delete debounceTimers.current[serieId];
+                const v = values[serieId];
+                if (!v) continue;
+                const owner = exercises.find((re) => re.series.some((s) => s.id === serieId));
+                if (!owner) continue;
+                void updateSerieValueInDB(serieId, owner.exercise.id, v.weight, v.reps);
+            }
+        };
+        const onHidden = () => {
+            if (document.visibilityState === "hidden") flushPending();
+        };
+        document.addEventListener("visibilitychange", onHidden);
+        window.addEventListener("pagehide", flushPending);
+        return () => {
+            document.removeEventListener("visibilitychange", onHidden);
+            window.removeEventListener("pagehide", flushPending);
+        };
+    }, [updateSerieValueInDB]);
+
     // Finalizar sesión y mostrar resumen
     const handleFinishSession = async () => {
         try {
             setFinishing(true);
             stopRestTimer();
             const result = await finishSession(sessionId);
+            clearActiveSession(sessionId);
+            clearAllSerieDrafts(sessionId);
+            clearOutboxForSession(sessionId);
             if (session?.user_id) invalidateProgressDataset(session.user_id);
             setSession((prev) => (prev ? { ...prev, status: "finished" } : prev));
             setSummary(result);
         } catch (error) {
             console.error("Error finalizando sesión:", error);
-            toast.error("Error al finalizar la sesión");
+            if (!isOnline()) {
+                enqueueOutbox({ kind: "finish-session", sessionId });
+                refreshPending();
+                toast.info("Sin conexión: la sesión se finalizará sola al volver la red");
+            } else {
+                toast.error("Error al finalizar la sesión");
+            }
         } finally {
             setFinishing(false);
         }
@@ -413,6 +554,9 @@ export default function SessionPage() {
             setCancelling(true);
             stopRestTimer();
             await cancelSession(sessionId);
+            clearActiveSession(sessionId);
+            clearAllSerieDrafts(sessionId);
+            clearOutboxForSession(sessionId);
             if (session?.user_id) invalidateProgressDataset(session.user_id);
             router.push("/rutinas");
         } catch (error) {
@@ -470,6 +614,29 @@ export default function SessionPage() {
     }
 
     if (!session) {
+        if (loadOffline) {
+            return (
+                <div className="flex items-center justify-center min-h-screen px-4">
+                    <div className="text-center max-w-sm">
+                        <p className="text-4xl" aria-hidden>📶</p>
+                        <h1 className="mt-4 text-xl font-bold text-slate-900">Sin conexión</h1>
+                        <p className="mt-2 text-sm text-slate-600">
+                            No pudimos cargar tu sesión. Tus cambios guardados están a salvo y se sincronizarán solos.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setLoadOffline(false);
+                                loadSessionData();
+                            }}
+                            className="mt-6 w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            Reintentar
+                        </button>
+                    </div>
+                </div>
+            );
+        }
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="text-center">
@@ -546,11 +713,23 @@ export default function SessionPage() {
                                 {routineExercises.length} ejercicios
                             </p>
                         </div>
-                        <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
-                            <Timer className="h-5 w-5 text-blue-600" />
-                            <span className="text-xl font-mono font-bold text-blue-600">
-                                {formatElapsedTime(elapsedTime)}
-                            </span>
+                        <div className="flex flex-col items-end gap-1.5">
+                            <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
+                                <Timer className="h-5 w-5 text-blue-600" />
+                                <span className="text-xl font-mono font-bold text-blue-600">
+                                    {formatElapsedTime(elapsedTime)}
+                                </span>
+                            </div>
+                            {!online && (
+                                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                                    Sin conexión{pending > 0 ? ` · ${pending} por sincronizar` : " · se guarda local"}
+                                </span>
+                            )}
+                            {online && pending > 0 && (
+                                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                                    Sincronizando {pending}…
+                                </span>
+                            )}
                         </div>
                     </div>
 
@@ -606,12 +785,10 @@ export default function SessionPage() {
                                                     {routineExercise.exercise.name}
                                                 </h3>
                                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-slate-600">
-                                                    {routineExercise.exercise.muscle && (
-                                                        <span className="flex items-center gap-1">
-                                                            <Dumbbell className="h-4 w-4 shrink-0" />
-                                                            {normalizeMuscleGroup(routineExercise.exercise.muscle) ?? routineExercise.exercise.muscle}
-                                                        </span>
-                                                    )}
+                                                    <span className="flex items-center gap-1">
+                                                        <Dumbbell className="h-4 w-4 shrink-0" />
+                                                        {muscleName(routineExercise.exercise.primary_muscle_id)}
+                                                    </span>
                                                     {routineExercise.exercise.equipment && (
                                                         <span className="truncate">• {equipmentLabel(routineExercise.exercise.equipment) ?? routineExercise.exercise.equipment}</span>
                                                     )}

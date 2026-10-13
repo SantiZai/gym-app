@@ -16,20 +16,25 @@ interface FilterSelectProps {
   onChange: (value: string) => void;
   allLabel: string;
   options: string[];
+  /** Etiqueta visible por valor (por defecto se muestra el valor crudo). */
+  labels?: Record<string, string>;
   ariaLabel: string;
 }
 
-export function FilterSelect({ value, onChange, allLabel, options, ariaLabel }: FilterSelectProps) {
+export function FilterSelect({ value, onChange, allLabel, options, labels, ariaLabel }: FilterSelectProps) {
   const normalizedValue = value === "" ? ALL_VALUE : value;
+
+  const labelOf = (option: string) => labels?.[option] ?? option;
 
   // Base UI solo muestra el label del item si se le pasa `items`.
   // Sin esto, <SelectValue /> renderiza el valor crudo ("__all").
   const items = useMemo(
     () => [
       { label: allLabel, value: ALL_VALUE },
-      ...options.map((option) => ({ label: option, value: option })),
+      ...options.map((option) => ({ label: labelOf(option), value: option })),
     ],
-    [allLabel, options]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allLabel, options, labels]
   );
 
   return (
@@ -42,7 +47,7 @@ export function FilterSelect({ value, onChange, allLabel, options, ariaLabel }: 
         <SelectValue placeholder={allLabel}>
           {(v: string | null) => {
             if (!v || v === ALL_VALUE) return allLabel;
-            return v;
+            return labelOf(v);
           }}
         </SelectValue>
       </SelectTrigger>
@@ -50,7 +55,7 @@ export function FilterSelect({ value, onChange, allLabel, options, ariaLabel }: 
         <SelectItem value={ALL_VALUE}>{allLabel}</SelectItem>
         {options.map((option) => (
           <SelectItem key={option} value={option}>
-            {option}
+            {labelOf(option)}
           </SelectItem>
         ))}
       </SelectContent>

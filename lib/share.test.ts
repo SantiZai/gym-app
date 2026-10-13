@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { buildShareText } from "./share";
 
 const RECORDS = [
-  { exerciseId: "1", name: "Press banca", muscle: "Pecho", bestE1rm: 100, bestWeight: 90, bestReps: 5, achievedAt: "2026-09-01T10:00:00" },
-  { exerciseId: "2", name: "Sentadilla", muscle: "Piernas", bestE1rm: 120, bestWeight: 100, bestReps: 5, achievedAt: "2026-09-02T10:00:00" },
+  { exerciseId: "1", name: "Press banca", muscle: "pectoral", bestE1rm: 100, bestWeight: 90, bestReps: 5, achievedAt: "2026-09-01T10:00:00" },
+  { exerciseId: "2", name: "Sentadilla", muscle: "cuadriceps", bestE1rm: 120, bestWeight: 100, bestReps: 5, achievedAt: "2026-09-02T10:00:00" },
 ];
 
 describe("buildShareText", () => {

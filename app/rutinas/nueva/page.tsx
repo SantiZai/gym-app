@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Search, Plus, X, Save, Dumbbell, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
 import { Exercise } from "@/types/db";
 import { getExercises } from "@/utils/exercisesUtils";
-import { normalizeMuscleGroup, type MuscleGroup } from "@/lib/muscleGroups";
+import { MUSCLES, muscleName } from "@/lib/muscles";
 import { equipmentLabel } from "@/lib/exerciseLabels";
 import { SwipeableRow } from "@/components/shared/SwipeableRow";
 import { FilterSelect } from "@/components/shared/FilterSelect";
@@ -47,7 +47,7 @@ export default function NuevaRutinaPage() {
     useEffect(() => {
         const filtrados = ejercicios.filter(ejercicio => {
             const coincideBusqueda = ejercicio.name.toLowerCase().includes(busqueda.toLowerCase());
-            const coincideMusculo = !filtroMusculo || normalizeMuscleGroup(ejercicio.muscle) === filtroMusculo;
+            const coincideMusculo = !filtroMusculo || ejercicio.primary_muscle_id === filtroMusculo;
             const coincideTipo = !filtroTipo || ejercicio.type === filtroTipo;
             const coincideEquipamiento = !filtroEquipamiento || ejercicio.equipment === filtroEquipamiento;
 
@@ -57,7 +57,9 @@ export default function NuevaRutinaPage() {
         setEjerciciosFiltrados(filtrados);
     }, [ejercicios, busqueda, filtroMusculo, filtroTipo, filtroEquipamiento]);
 
-    const musculos = [...new Set(ejercicios.map(e => normalizeMuscleGroup(e.muscle)).filter((v): v is MuscleGroup => !!v))];
+    // Músculos presentes en el catálogo, en orden canónico
+    const musculos = MUSCLES.filter(m => ejercicios.some(e => e.primary_muscle_id === m.slug)).map(m => m.slug);
+    const musculoLabels = Object.fromEntries(MUSCLES.map(m => [m.slug, `${m.name} · ${m.region}`]));
     const tipos = [...new Set(ejercicios.map(e => e.type).filter((v): v is string => !!v))];
     const equipamientos = [...new Set(ejercicios.map(e => e.equipment).filter((v): v is string => !!v))];
 
@@ -340,6 +342,7 @@ export default function NuevaRutinaPage() {
                                         onChange={setFiltroMusculo}
                                         allLabel="Todos los músculos"
                                         options={musculos}
+                                        labels={musculoLabels}
                                         ariaLabel="Filtrar por músculo"
                                     />
 
@@ -384,12 +387,19 @@ export default function NuevaRutinaPage() {
                                                         }`}
                                                 >
                                                     <div className="flex items-center justify-between gap-3">
-                                                        <h3 className="flex-1 min-w-0 font-medium text-slate-900 break-words">
-                                                            {ejercicio.name}{" "}
-                                                            <span className="font-normal text-slate-500">
-                                                                - {equipmentLabel(ejercicio.equipment) ?? "—"}
-                                                            </span>
-                                                        </h3>
+                                                        <div className="flex-1 min-w-0">
+                                                            <h3 className="font-medium text-slate-900 break-words">
+                                                                {ejercicio.name}{" "}
+                                                                <span className="font-normal text-slate-500">
+                                                                    - {equipmentLabel(ejercicio.equipment) ?? "—"}
+                                                                </span>
+                                                            </h3>
+                                                            <p className="mt-0.5 text-xs text-slate-500">
+                                                                {muscleName(ejercicio.primary_muscle_id)}
+                                                                {ejercicio.secondary_muscle_ids?.length > 0 &&
+                                                                    ` · +${ejercicio.secondary_muscle_ids.map((s) => muscleName(s)).join(", ")}`}
+                                                            </p>
+                                                        </div>
                                                         <button
                                                             onClick={() =>
                                                                 yaSeleccionado

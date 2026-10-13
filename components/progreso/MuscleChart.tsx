@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { MUSCLE_GROUP_COLORS } from "@/lib/muscleGroups";
+import { muscleColor, muscleName } from "@/lib/muscles";
 import { ChartCard } from "@/components/shared/ChartCard";
 import { MinimalTooltip } from "@/components/progreso/ChartTooltip";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -11,7 +11,11 @@ import { cn } from "cn";
 import type { MuscleSlice } from "@/types/progress";
 
 function groupColor(group: string): string {
-  return MUSCLE_GROUP_COLORS[group as keyof typeof MUSCLE_GROUP_COLORS] ?? "#94a3b8";
+  return muscleColor(group);
+}
+
+function groupLabel(group: string): string {
+  return muscleName(group);
 }
 
 export function MuscleChart({ data, loading }: { data: MuscleSlice[]; loading: boolean }) {
@@ -24,7 +28,7 @@ export function MuscleChart({ data, loading }: { data: MuscleSlice[]; loading: b
 
   if (loading) {
     return (
-      <ChartCard title="Zonas musculares" description="Distribución de tu trabajo">
+      <ChartCard title="Músculos" description="Distribución de tu trabajo">
         <Skeleton className="h-[280px] w-full" />
       </ChartCard>
     );
@@ -32,17 +36,17 @@ export function MuscleChart({ data, loading }: { data: MuscleSlice[]; loading: b
 
   if (data.length === 0) {
     return (
-      <ChartCard title="Zonas musculares" description="Distribución de tu trabajo">
+      <ChartCard title="Músculos" description="Distribución de tu trabajo">
         <EmptyState
           title="Sin datos musculares"
-          description="Cuando completes series, vas a ver qué zonas trabajas más y detectar desbalances."
+          description="Cuando completes series, vas a ver qué músculos trabajas más y detectar desbalances."
         />
       </ChartCard>
     );
   }
 
   return (
-    <ChartCard title="Zonas musculares" description={`${total} series en el período · tocá para detallar`}>
+    <ChartCard title="Músculos" description={`${total} series en el período · tocá para detallar`}>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="relative h-[260px]">
           <ResponsiveContainer width="100%" height="100%">
@@ -85,7 +89,7 @@ export function MuscleChart({ data, loading }: { data: MuscleSlice[]; loading: b
               {active ? `${activePct}%` : total}
             </p>
             <p className="max-w-[120px] truncate text-xs text-slate-500">
-              {active ? active.group : "series"}
+              {active ? groupLabel(active.group) : "series"}
             </p>
           </div>
         </div>
@@ -108,7 +112,7 @@ export function MuscleChart({ data, loading }: { data: MuscleSlice[]; loading: b
                   <div className="flex items-center justify-between text-sm">
                     <span className="flex items-center gap-2 font-medium text-slate-700">
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
-                      {d.group}
+                      {groupLabel(d.group)}
                     </span>
                     <span className="text-slate-500 tabular-nums">
                       {d.series} · {pct}%
