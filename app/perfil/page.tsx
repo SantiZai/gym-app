@@ -158,7 +158,8 @@ export default function PerfilPage() {
                                         onClick={saveGoal}
                                         disabled={savingGoal}
                                         title="Guardar objetivo"
-                                        className="rounded-lg bg-blue-600 p-1.5 text-white hover:bg-blue-700 disabled:opacity-50"
+                                        aria-label="Guardar objetivo"
+                                        className="rounded-lg bg-blue-600 p-2.5 text-white hover:bg-blue-700 disabled:opacity-50"
                                     >
                                         <Check className="h-4 w-4" />
                                     </button>
@@ -166,7 +167,8 @@ export default function PerfilPage() {
                                         onClick={() => { setDraftGoal(profile.objetivo); setEditingGoal(false); }}
                                         disabled={savingGoal}
                                         title="Cancelar"
-                                        className="rounded-lg bg-white p-1.5 text-slate-600 hover:bg-slate-200 disabled:opacity-50"
+                                        aria-label="Cancelar edición de objetivo"
+                                        className="rounded-lg bg-white p-2.5 text-slate-600 hover:bg-slate-200 disabled:opacity-50"
                                     >
                                         <X className="h-4 w-4" />
                                     </button>
@@ -177,7 +179,8 @@ export default function PerfilPage() {
                                     <button
                                         onClick={() => setEditingGoal(true)}
                                         title="Editar objetivo"
-                                        className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
+                                        aria-label="Editar objetivo"
+                                        className="rounded-lg p-2.5 text-slate-500 hover:bg-slate-200 hover:text-slate-700"
                                     >
                                         <Pencil className="h-4 w-4" />
                                     </button>
@@ -199,7 +202,8 @@ export default function PerfilPage() {
                                         onClick={saveBody}
                                         disabled={savingBody}
                                         title="Guardar"
-                                        className="rounded-lg bg-blue-600 p-1.5 text-white hover:bg-blue-700 disabled:opacity-50"
+                                        aria-label="Guardar peso y altura"
+                                        className="rounded-lg bg-blue-600 p-2.5 text-white hover:bg-blue-700 disabled:opacity-50"
                                     >
                                         <Check className="h-4 w-4" />
                                     </button>
@@ -207,7 +211,8 @@ export default function PerfilPage() {
                                         onClick={() => setEditingBody(false)}
                                         disabled={savingBody}
                                         title="Cancelar"
-                                        className="rounded-lg bg-slate-100 p-1.5 text-slate-600 hover:bg-slate-200 disabled:opacity-50"
+                                        aria-label="Cancelar edición de peso y altura"
+                                        className="rounded-lg bg-slate-100 p-2.5 text-slate-600 hover:bg-slate-200 disabled:opacity-50"
                                     >
                                         <X className="h-4 w-4" />
                                     </button>
@@ -216,7 +221,8 @@ export default function PerfilPage() {
                                 <button
                                     onClick={startEditingBody}
                                     title="Editar peso y altura"
-                                    className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                    aria-label="Editar peso y altura"
+                                    className="rounded-lg p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                                 >
                                     <Pencil className="h-4 w-4" />
                                 </button>
@@ -237,6 +243,7 @@ export default function PerfilPage() {
                                             value={draftPeso}
                                             onChange={(e) => setDraftPeso(e.target.value)}
                                             disabled={savingBody}
+                                            aria-label="Peso en kilogramos"
                                             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-2xl font-semibold text-slate-900 focus:border-blue-500 focus:outline-none"
                                         />
                                         <span className="text-sm text-slate-500">kg</span>
@@ -261,6 +268,7 @@ export default function PerfilPage() {
                                             value={draftAltura}
                                             onChange={(e) => setDraftAltura(e.target.value)}
                                             disabled={savingBody}
+                                            aria-label="Altura en centímetros"
                                             className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-2xl font-semibold text-slate-900 focus:border-blue-500 focus:outline-none"
                                         />
                                         <span className="text-sm text-slate-500">cm</span>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Search, Plus, X, Save, Dumbbell, ChevronUp, ChevronDown, Trash2 } from "lucide-react";
 import { Exercise } from "@/types/db";
 import { getExercises } from "@/utils/exercisesUtils";
@@ -19,6 +20,7 @@ interface ExerciseWithSelectedNotes extends Exercise {
 }
 
 export default function NuevaRutinaPage() {
+    const router = useRouter();
     const [rutinaNombre, setRutinaNombre] = useState("");
     const [rutinaDescripcion, setRutinaDescripcion] = useState("");
     const [rutinaPublica, setRutinaPublica] = useState(false);
@@ -33,15 +35,26 @@ export default function NuevaRutinaPage() {
     const [filtroEquipamiento, setFiltroEquipamiento] = useState("");
 
     const [loading, setLoading] = useState(true);
+    const [loadFailed, setLoadFailed] = useState(false);
     const [guardando, setGuardando] = useState(false);
     const [openActionsId, setOpenActionsId] = useState<string | null>(null);
 
-    useEffect(() => {
+    const cargarEjercicios = () => {
+        setLoading(true);
+        setLoadFailed(false);
         getExercises().then(data => {
             setEjercicios(data);
             setEjerciciosFiltrados(data);
             setLoading(false);
-        })
+        }).catch((error) => {
+            console.error("Error cargando ejercicios:", error);
+            setLoadFailed(true);
+            setLoading(false);
+        });
+    };
+
+    useEffect(() => {
+        cargarEjercicios();
     }, []);
 
     useEffect(() => {
@@ -133,7 +146,7 @@ export default function NuevaRutinaPage() {
 
         createRoutineBasic(generatePayload()).then(() => {
             setGuardando(false)
-            window.location.href = "/rutinas";
+            router.push("/rutinas");
         }).catch((error) => {
             console.error("Error guardando rutina:", error);
             setGuardando(false)
@@ -154,6 +167,26 @@ export default function NuevaRutinaPage() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-center items-center h-64">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (loadFailed) {
+        return (
+            <div className="min-h-screen bg-slate-50 py-8">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                        <p className="text-lg font-semibold text-slate-900">No se pudieron cargar los ejercicios</p>
+                        <p className="mt-2 text-sm text-slate-600">Revisá tu conexión e intentá de nuevo.</p>
+                        <button
+                            type="button"
+                            onClick={cargarEjercicios}
+                            className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+                        >
+                            Reintentar
+                        </button>
                     </div>
                 </div>
             </div>
@@ -204,28 +237,30 @@ export default function NuevaRutinaPage() {
 
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    <label htmlFor="rutina-nombre" className="block text-sm font-medium text-slate-700 mb-2">
                                         Nombre de la rutina *
                                     </label>
                                     <input
+                                        id="rutina-nombre"
                                         type="text"
                                         value={rutinaNombre}
                                         onChange={(e) => setRutinaNombre(e.target.value)}
                                         placeholder="Ej: Rutina de Pecho y Tríceps"
-                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300"
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg shadow-sm text-base text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300 md:text-sm"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                                    <label htmlFor="rutina-descripcion" className="block text-sm font-medium text-slate-700 mb-2">
                                         Descripción
                                     </label>
                                     <textarea
+                                        id="rutina-descripcion"
                                         value={rutinaDescripcion}
                                         onChange={(e) => setRutinaDescripcion(e.target.value)}
                                         placeholder="Describe tu rutina..."
                                         rows={3}
-                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300"
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg shadow-sm text-base text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300 md:text-sm"
                                     />
                                 </div>
 
@@ -332,7 +367,8 @@ export default function NuevaRutinaPage() {
                                             value={busqueda}
                                             onChange={(e) => setBusqueda(e.target.value)}
                                             placeholder="Buscar ejercicios..."
-                                            className="w-full pl-10 pr-3 py-2 bg-white border border-slate-200 rounded-lg shadow-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300"
+                                            aria-label="Buscar ejercicios"
+                                            className="w-full pl-10 pr-3 py-2 bg-white border border-slate-200 rounded-lg shadow-sm text-base text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300 md:text-sm"
                                         />
                                     </div>
 

@@ -17,7 +17,7 @@ import { updateSerie } from "@/utils/routineUtils";
 import { muscleName } from "@/lib/muscles";
 import { equipmentLabel } from "@/lib/exerciseLabels";
 import { estimate1RM, getPersonalRecords, invalidateProgressDataset } from "@/utils/progressUtils";
-import { clearActiveSession, setActiveSession } from "@/lib/activeSession";
+import { clearActiveSession, getSessionSummary, saveSessionSummary, setActiveSession } from "@/lib/activeSession";
 import {
     clearAllSerieDrafts,
     clearSerieDraft,
@@ -64,7 +64,9 @@ export default function SessionPage() {
     const [finishing, setFinishing] = useState(false);
     const [cancelling, setCancelling] = useState(false);
     const [confirmandoCancelacion, setConfirmandoCancelacion] = useState(false);
-    const [summary, setSummary] = useState<SessionSummary | null>(null);
+    const [summary, setSummary] = useState<SessionSummary | null>(() =>
+        sessionId ? getSessionSummary(sessionId) : null
+    );
 
     const { elapsedTime, formatElapsedTime } = useSessionTimer(session);
     const handleRestFinished = useCallback(() => {
@@ -93,6 +95,7 @@ export default function SessionPage() {
         if (mine) {
             clearActiveSession(sessionId);
             clearAllSerieDrafts(sessionId);
+            saveSessionSummary(sessionId, mine.summary);
             setSession((prev) => (prev ? { ...prev, status: "finished" } : prev));
             setSummary(mine.summary);
             toast.success("Sesión sincronizada y finalizada");
@@ -167,15 +170,22 @@ export default function SessionPage() {
             setRoutineExercises(transformedRoutineExercises);
             setSessionSeries(sessionSeriesArr);
 
-            // Registrar como sesión activa (retomar al salir y volver)
-            if (sessionObj.status !== "finished") {
-                setActiveSession({
-                    sessionId,
-                    routineId: sessionObj.routine_id ?? null,
-                    userId: sessionObj.user_id ?? null,
-                    startedAt: sessionObj.started_at ?? null,
-                });
+            // Si ya estaba finalizada (refresh en el resumen), no hay nada que retomar
+            if (sessionObj.status === "finished") {
+                clearActiveSession(sessionId);
+                const stored = getSessionSummary(sessionId);
+                if (stored) setSummary(stored);
+                setLoading(false);
+                return;
             }
+
+            // Registrar como sesión activa (retomar al salir y volver)
+            setActiveSession({
+                sessionId,
+                routineId: sessionObj.routine_id ?? null,
+                userId: sessionObj.user_id ?? null,
+                startedAt: sessionObj.started_at ?? null,
+            });
 
             // Inicializar valores de peso y reps para cada serie.
             // La DB manda; si no hay nada guardado y hay borrador local
@@ -363,7 +373,7 @@ export default function SessionPage() {
 
             return updatedValues;
         });
-    }, [updateSerieValueInDB]);
+    }, [updateSerieValueInDB, sessionId]);
 
     // Completar/descompletar serie con UI OPTIMISTA: pinta al instante y
     // sincroniza en background con 1 RPC. Antes esperaba 1-2 roundtrips
@@ -531,6 +541,7 @@ export default function SessionPage() {
             clearActiveSession(sessionId);
             clearAllSerieDrafts(sessionId);
             clearOutboxForSession(sessionId);
+            saveSessionSummary(sessionId, result);
             if (session?.user_id) invalidateProgressDataset(session.user_id);
             setSession((prev) => (prev ? { ...prev, status: "finished" } : prev));
             setSummary(result);
@@ -696,8 +707,40 @@ export default function SessionPage() {
         );
     }
 
+    if (session.status === "finished") {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-8">
+                <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border p-8 text-center">
+                    <div className="mx-auto w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
+                        <Trophy className="h-8 w-8 text-green-600" aria-hidden />
+                    </div>
+                    <h1 className="mt-4 text-2xl font-bold text-slate-900">
+                        Sesión finalizada
+                    </h1>
+                    <p className="mt-1 text-sm text-slate-500">
+                        Esta sesión ya está cerrada. El detalle vive en tu progreso.
+                    </p>
+                    <div className="mt-6 flex flex-col gap-2">
+                        <Link
+                            href="/progreso"
+                            className="w-full px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200 text-center"
+                        >
+                            Ver mi progreso
+                        </Link>
+                        <Link
+                            href="/rutinas"
+                            className="w-full px-4 py-2.5 bg-white text-slate-700 text-sm font-medium rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors duration-200 text-center"
+                        >
+                            Volver a rutinas
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="min-h-screen bg-slate-50 pb-20">
+        <div className="min-h-screen bg-slate-50 pb-20 overscroll-none">
             {/* Header fijo: sigue a la nav móvil (var --nav-top) para no quedar tapado */}
             <div
                 className="bg-white border-b sticky z-10 shadow-sm transition-[top] duration-300"
@@ -714,9 +757,9 @@ export default function SessionPage() {
                             </p>
                         </div>
                         <div className="flex flex-col items-end gap-1.5">
-                            <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
-                                <Timer className="h-5 w-5 text-blue-600" />
-                                <span className="text-xl font-mono font-bold text-blue-600">
+                            <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg dark:bg-blue-950/50">
+                                <Timer className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                <span className="text-xl font-mono font-bold text-blue-600 dark:text-blue-300">
                                     {formatElapsedTime(elapsedTime)}
                                 </span>
                             </div>
@@ -919,7 +962,7 @@ export default function SessionPage() {
 
             {/* Pill de descanso */}
             {resting && !summary && (
-                <div className="fixed bottom-24 left-1/2 z-20 -translate-x-1/2">
+                <div className="fixed left-1/2 z-20 -translate-x-1/2 bottom-[calc(6rem+env(safe-area-inset-bottom))]">
                     <div className="flex items-center gap-2 rounded-full bg-slate-900 py-2 pl-4 pr-2 text-white shadow-lg">
                         <Timer className="h-4 w-4 text-blue-300" aria-hidden />
                         <span className="font-mono text-lg font-bold tabular-nums">
@@ -927,15 +970,16 @@ export default function SessionPage() {
                         </span>
                         <span className="text-xs text-slate-300">descanso</span>
                         <button
-                            onClick={() => startRestTimer(restTime + 30)}
-                            className="rounded-full bg-slate-700 px-2.5 py-1 text-xs font-medium hover:bg-slate-600"
+                            onClick={() => startRestTimer(Math.min(restTime + 30, 5999))}
+                            aria-label="Sumar 30 segundos al descanso"
+                            className="rounded-full bg-slate-700 px-3 py-2 text-xs font-medium hover:bg-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                         >
                             +30
                         </button>
                         <button
                             onClick={stopRestTimer}
                             aria-label="Saltar descanso"
-                            className="rounded-full p-1.5 hover:bg-slate-700"
+                            className="rounded-full p-2.5 hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                         >
                             <X className="h-4 w-4" aria-hidden />
                         </button>
@@ -944,7 +988,7 @@ export default function SessionPage() {
             )}
 
             {/* Footer fijo con acciones */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg pb-[env(safe-area-inset-bottom)] dark:bg-slate-900 dark:border-white/10">
                 <div className="max-w-4xl mx-auto px-4 py-4 flex gap-3">
                     <Button
                         variant="outline"

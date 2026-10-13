@@ -36,8 +36,8 @@ import { FilterSelect } from "@/components/shared/FilterSelect";
 import { toast } from "sonner";
 
 const TIPOS_SERIE = [
-    { value: "normal", label: "Normal", color: "bg-blue-100 text-blue-800" },
-    { value: "warm-up", label: "Calentamiento", color: "bg-yellow-100 text-yellow-800" },
+    { value: "normal", label: "Normal", color: "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300" },
+    { value: "warm-up", label: "Calentamiento", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-300" },
     { value: "dropset", label: "Dropset", color: "bg-slate-100 text-slate-800" },
     { value: "otro", label: "Otro", color: "bg-slate-100 text-slate-800" }
 ];
@@ -60,6 +60,8 @@ export default function EditarRutinaPage() {
 
     const [rutina, setRutina] = useState<RoutineComplete | null>(null);
     const [loading, setLoading] = useState(true);
+    const [loadFailed, setLoadFailed] = useState(false);
+    const [retryKey, setRetryKey] = useState(0);
     const [guardando, setGuardando] = useState(false);
 
     const [routineExercises, setRoutineExercises] = useState<RoutineExercise[]>([]);
@@ -78,6 +80,7 @@ export default function EditarRutinaPage() {
         const loadRoutineData = async () => {
             try {
                 setLoading(true);
+                setLoadFailed(false);
                 const routine: Routine = await getRoutineById(rutinaId);
                 const routineExercises: RoutineExercise[] = await getRoutineExercises(rutinaId);
                 const exerciseIds: string[] = routineExercises.map((re) => re.exercise_id);
@@ -134,13 +137,14 @@ export default function EditarRutinaPage() {
                 setRoutineExercises(routineExercises);
             } catch (error) {
                 console.error("Error loading routine:", error);
+                setLoadFailed(true);
             } finally {
                 setLoading(false);
             }
         };
 
         loadRoutineData();
-    }, [rutinaId]);
+    }, [rutinaId, retryKey]);
 
     // Cargar catálogo completo de ejercicios (para el picker) una sola vez
     useEffect(() => {
@@ -465,12 +469,29 @@ export default function EditarRutinaPage() {
         return (
             <div className="min-h-screen bg-slate-50 py-8">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center">
-                        <h1 className="text-2xl font-bold text-slate-900">Rutina no encontrada</h1>
-                        <Link href="/rutinas" className="text-blue-600 hover:text-blue-700 mt-4 inline-block">
-                            Volver a rutinas
-                        </Link>
-                    </div>
+                    {loadFailed ? (
+                        <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                            <p className="text-lg font-semibold text-slate-900">No se pudo cargar la rutina</p>
+                            <p className="mt-2 text-sm text-slate-600">Revisá tu conexión e intentá de nuevo.</p>
+                            <button
+                                type="button"
+                                onClick={() => setRetryKey((k) => k + 1)}
+                                className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+                            >
+                                Reintentar
+                            </button>
+                            <Link href="/rutinas" className="mt-3 inline-block text-sm text-blue-600 hover:text-blue-700">
+                                Volver a rutinas
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="text-center">
+                            <h1 className="text-2xl font-bold text-slate-900">Rutina no encontrada</h1>
+                            <Link href="/rutinas" className="text-blue-600 hover:text-blue-700 mt-4 inline-block">
+                                Volver a rutinas
+                            </Link>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -574,14 +595,16 @@ export default function EditarRutinaPage() {
                                             <button
                                                 onClick={() => moverEjercicio(ejercicioIndex, "up")}
                                                 disabled={ejercicioIndex === 0}
-                                                className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                                                aria-label={`Subir ${ejercicio.name}`}
+                                                className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
                                             >
                                                 <ChevronUp className="h-4 w-4" />
                                             </button>
                                             <button
                                                 onClick={() => moverEjercicio(ejercicioIndex, "down")}
                                                 disabled={ejercicioIndex === rutina.exercises.length - 1}
-                                                className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30"
+                                                aria-label={`Bajar ${ejercicio.name}`}
+                                                className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
                                             >
                                                 <ChevronDown className="h-4 w-4" />
                                             </button>
@@ -605,8 +628,9 @@ export default function EditarRutinaPage() {
                                         </button>
                                         <button
                                             onClick={() => eliminarEjercicio(ejercicioIndex)}
-                                            className="inline-flex items-center px-3 py-2 bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 transition-colors duration-200"
+                                            className="inline-flex items-center px-3 py-2 bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 transition-colors duration-200 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-950"
                                             title="Eliminar ejercicio"
+                                            aria-label={`Eliminar ${ejercicio.name} de la rutina`}
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </button>
@@ -673,6 +697,7 @@ export default function EditarRutinaPage() {
                                                             disabled={serieIndex === 0}
                                                             className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
                                                             title="Mover arriba"
+                                                            aria-label={`Mover serie ${serieIndex + 1} arriba`}
                                                         >
                                                             <ChevronUp className="h-4 w-4" />
                                                         </button>
@@ -681,6 +706,7 @@ export default function EditarRutinaPage() {
                                                             disabled={serieIndex === ejercicio.series.length - 1}
                                                             className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
                                                             title="Mover abajo"
+                                                            aria-label={`Mover serie ${serieIndex + 1} abajo`}
                                                         >
                                                             <ChevronDown className="h-4 w-4" />
                                                         </button>
@@ -688,6 +714,7 @@ export default function EditarRutinaPage() {
                                                             onClick={() => duplicarSerie(ejercicio.id, serie.id)}
                                                             className="p-2 text-blue-500 hover:text-blue-700"
                                                             title="Duplicar serie"
+                                                            aria-label={`Duplicar serie ${serieIndex + 1}`}
                                                         >
                                                             <Copy className="h-4 w-4" />
                                                         </button>
@@ -696,6 +723,7 @@ export default function EditarRutinaPage() {
                                                             disabled={ejercicio.series.length <= 1}
                                                             className="p-2 text-red-500 hover:text-red-700 disabled:opacity-30"
                                                             title="Eliminar serie"
+                                                            aria-label={`Eliminar serie ${serieIndex + 1}`}
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </button>

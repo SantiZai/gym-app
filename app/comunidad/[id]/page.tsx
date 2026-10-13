@@ -95,12 +95,21 @@ export default function ComunidadDetallePage() {
             description="Puede que haya dejado de ser pública o falte la migración de comunidad."
             icon={Dumbbell}
             action={
-              <Link
-                href="/comunidad"
-                className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                Volver a comunidad
-              </Link>
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void load()}
+                  className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Reintentar
+                </button>
+                <Link
+                  href="/comunidad"
+                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Volver a comunidad
+                </Link>
+              </div>
             }
           />
         </div>
@@ -169,7 +178,7 @@ export default function ComunidadDetallePage() {
                   ))}
                 </ul>
               ) : (
-                <p className="mt-3 text-sm text-slate-400">Sin series planificadas.</p>
+                <p className="mt-3 text-sm text-slate-500">Sin series planificadas.</p>
               )}
               {item.notes ? <p className="mt-2 text-xs italic text-slate-500">💡 {item.notes}</p> : null}
             </div>
@@ -177,7 +186,7 @@ export default function ComunidadDetallePage() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-white shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 border-t bg-white shadow-lg pb-[env(safe-area-inset-bottom)] dark:bg-slate-900 dark:border-white/10">
         <div className="mx-auto max-w-3xl px-4 py-4 sm:px-6 lg:px-8">
           {isMine ? (
             <Link

@@ -2,15 +2,15 @@ import { createClient } from "./supabase/client";
 import type { Session, SessionSerie } from "@/types/db";
 import type { SessionSummary } from "@/types/progress";
 
-export const startSession = async (routineId: string) => {
+export const startSession = async (routineId: string): Promise<string> => {
   const supabase = await createClient()
   const { data, error } = await supabase.rpc('start_session', { p_routine_id: routineId });
   if (error) throw error;
   // data es uuid retornado (puede variar según supabase rpc wrapper)
   // if supabase returns array: const sesionId = data[0];
   const sesionId = data as unknown as string;
-  // redirigir a la ruta de sesión
-  window.location.href = `/sesion/${sesionId}`;
+  if (!sesionId || typeof sesionId !== "string") throw new Error("No se pudo iniciar la sesión");
+  return sesionId;
 }
 
 export async function getUserSessions(userId: string) {

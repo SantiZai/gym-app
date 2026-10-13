@@ -108,7 +108,8 @@ export default function ComunidadPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nombre, descripción o autor…"
-            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Buscar rutinas de la comunidad"
+            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-base text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 md:text-sm"
           />
         </div>
 
@@ -121,8 +122,25 @@ export default function ComunidadPage() {
         ) : failed ? (
           <EmptyState
             title="La comunidad no está disponible"
-            description="Falta aplicar la migración de lectura pública (sql/migrations/community_public_read.sql)."
+            description="Revisá tu conexión. Si el problema sigue, puede faltar la migración de lectura pública (sql/migrations/community_public_read.sql)."
             icon={Users}
+            action={
+              <button
+                type="button"
+                onClick={() => {
+                  if (!user) return;
+                  setLoading(true);
+                  setFailed(false);
+                  getPublicRoutines(user.id)
+                    .then((data) => setRoutines(data))
+                    .catch(() => setFailed(true))
+                    .finally(() => setLoading(false));
+                }}
+                className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Reintentar
+              </button>
+            }
           />
         ) : filtered.length === 0 ? (
           <EmptyState

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
 const inputClass =
-  "w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30";
+  "w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-base text-slate-900 placeholder-slate-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 md:text-sm";
 
 export default function NuevaRutinaGymPage() {
   const params = useParams();
@@ -67,11 +67,11 @@ export default function NuevaRutinaGymPage() {
             <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Fuerza inicial" maxLength={80} required className="h-11" />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-slate-700">Descripción <span className="font-normal text-slate-400">(opcional)</span></span>
+            <span className="mb-1.5 block text-sm font-medium text-slate-700">Descripción <span className="font-normal text-slate-500">(opcional)</span></span>
             <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="A quién está dirigida, nivel…" maxLength={500} rows={3} className={inputClass} />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-slate-700">Categoría <span className="font-normal text-slate-400">(opcional)</span></span>
+            <span className="mb-1.5 block text-sm font-medium text-slate-700">Categoría <span className="font-normal text-slate-500">(opcional)</span></span>
             <Input value={categoria} onChange={(e) => setCategoria(e.target.value)} placeholder="Fuerza, Hipertrofia…" maxLength={50} className="h-11" />
           </label>
           <Button type="submit" disabled={guardando} className="h-11 w-full bg-blue-600 hover:bg-blue-700">

@@ -57,7 +57,7 @@ export function InstallPrompt() {
   };
 
   return (
-    <div className="fixed bottom-20 left-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2">
+    <div className="fixed left-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 bottom-[calc(5rem+env(safe-area-inset-bottom))]">
       <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white py-3 pl-4 pr-2 shadow-xl">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100">
           <Download className="h-5 w-5 text-blue-700" aria-hidden />

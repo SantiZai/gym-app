@@ -15,6 +15,10 @@ const PRECACHE = [
   "/manifest.webmanifest",
 ];
 
+// Rutas públicas: las únicas navegaciones que se cachean. Las protegidas
+// van solo a red (evita mostrar HTML stale con otra sesión tras logout).
+const PUBLIC_PATHS = new Set(["/", "/offline", "/privacidad", "/login", "/register"]);
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -62,13 +66,15 @@ self.addEventListener("fetch", (event) => {
   // APIs y auth: solo red.
   if (url.pathname.startsWith("/api/")) return;
 
-  // Navegaciones: red primero, caché después, /offline al final.
+  // Navegaciones: red primero; caché solo en rutas públicas; /offline al final.
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          if (PUBLIC_PATHS.has(url.pathname)) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
           return res;
         })
         .catch(() =>

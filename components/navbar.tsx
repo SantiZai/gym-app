@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X, User as UserIcon, LogOut, ChevronDown } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
+import { clearActiveSession } from "@/lib/activeSession";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { APP_VERSION } from "@/lib/version";
 import { CafecitoMenuCard, CafecitoDropdownItem } from "@/components/cafecito-button";
@@ -136,13 +137,12 @@ export function Navbar() {
     try {
       const supabase = await createClient();
       await supabase.auth.signOut();
+      clearActiveSession();
       setIsOpen(false);
       setIsDropdownOpen(false);
       document.body.style.overflow = "";
-      // Refrescar el router para limpiar el caché de RSC (con la sesión vieja
-      // los Links parecían no responder hasta recargar) y navegar duro a /login.
+      router.replace("/login");
       router.refresh();
-      window.location.href = "/login";
     } catch (error) {
       console.error("Error signing out:", error);
     }
@@ -196,6 +196,8 @@ export function Navbar() {
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    aria-label="Abrir menú de usuario"
+                    aria-expanded={isDropdownOpen}
                     className="flex items-center space-x-2 py-2 px-3 rounded-lg hover:bg-blue-400/10 transition-colors duration-200 cursor-pointer"
                   >
                     {user?.avatar_url ? (

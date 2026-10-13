@@ -45,3 +45,29 @@ export function clearActiveSession(sessionId?: string): void {
     // ignorar
   }
 }
+
+// Resumen final: vive en memoria durante la sesión; se persiste para que
+// un refresh en la pantalla de "¡Sesión completada!" no la pierda.
+import type { SessionSummary } from "@/types/progress";
+
+const summaryKeyFor = (sessionId: string) => `habitus:summary:${sessionId}`;
+
+export function saveSessionSummary(sessionId: string, s: SessionSummary): void {
+  try {
+    localStorage.setItem(summaryKeyFor(sessionId), JSON.stringify(s));
+  } catch {
+    // ignorar
+  }
+}
+
+export function getSessionSummary(sessionId: string): SessionSummary | null {
+  try {
+    const raw = localStorage.getItem(summaryKeyFor(sessionId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as SessionSummary;
+    if (typeof parsed?.totalSeriesCompleted !== "number") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}

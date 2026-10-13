@@ -51,7 +51,7 @@ export function ActiveSessionBanner() {
   if (pathname?.startsWith(`/sesion/${active.sessionId}`)) return null;
 
   return (
-    <div className="fixed bottom-4 left-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2">
+    <div className="fixed left-1/2 z-40 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 bottom-[calc(1rem+env(safe-area-inset-bottom))]">
       <Link
         href={`/sesion/${active.sessionId}`}
         className="flex items-center gap-3 rounded-2xl bg-slate-900 py-3 pl-4 pr-3 text-white shadow-xl"

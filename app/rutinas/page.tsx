@@ -20,6 +20,8 @@ export default function RutinasPage() {
   const router = useRouter();
   const [rutinas, setRutinas] = useState<Routine[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [startingId, setStartingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [usingTemplate, setUsingTemplate] = useState<string | null>(null);
@@ -63,15 +65,40 @@ export default function RutinasPage() {
     }
   };
 
+  const handleStartSession = async (routineId: string) => {
+    setStartingId(routineId);
+    try {
+      const sessionId = await startSession(routineId);
+      router.push(`/sesion/${sessionId}`);
+    } catch (error) {
+      console.error("Error iniciando sesión:", error);
+      toast.error("No se pudo iniciar la sesión. Revisá tu conexión e intentá de nuevo.");
+    } finally {
+      setStartingId(null);
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
+    let alive = true;
+    setLoading(true);
+    setLoadFailed(false);
     getUserRoutines(user.id).then((data) => {
+      if (!alive) return;
       setRutinas(data);
       setLoading(false);
-    })
+    }).catch((error) => {
+      console.error("Error cargando rutinas:", error);
+      if (!alive) return;
+      setLoadFailed(true);
+      setLoading(false);
+    });
     getUserSessions(user.id)
-      .then((sessions) => setHistoryByRoutine(aggregateRoutineHistory(sessions)))
-      .catch(() => setHistoryByRoutine({}));
+      .then((sessions) => alive && setHistoryByRoutine(aggregateRoutineHistory(sessions)))
+      .catch(() => alive && setHistoryByRoutine({}));
+    return () => {
+      alive = false;
+    };
   }, [user]);
 
   const formatDate = (dateString: string) => {
@@ -88,6 +115,39 @@ export default function RutinasPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <div className="min-h-screen bg-slate-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <p className="text-lg font-semibold text-slate-900">No se pudieron cargar tus rutinas</p>
+            <p className="mt-2 text-sm text-slate-600">Revisá tu conexión e intentá de nuevo.</p>
+            <button
+              type="button"
+              onClick={() => {
+                if (!user) return;
+                setLoading(true);
+                setLoadFailed(false);
+                getUserRoutines(user.id)
+                  .then((data) => {
+                    setRutinas(data);
+                    setLoading(false);
+                  })
+                  .catch(() => {
+                    setLoadFailed(true);
+                    setLoading(false);
+                  });
+              }}
+              className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Reintentar
+            </button>
           </div>
         </div>
       </div>
@@ -120,8 +180,8 @@ export default function RutinasPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-100">
             <div className="flex items-center">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Calendar className="h-6 w-6 text-blue-600" />
+              <div className="p-3 bg-blue-100 rounded-lg dark:bg-blue-950/60">
+                <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-slate-600">Total Rutinas</p>
@@ -132,8 +192,8 @@ export default function RutinasPage() {
           
           <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-100">
             <div className="flex items-center">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Users className="h-6 w-6 text-green-600" />
+              <div className="p-3 bg-green-100 rounded-lg dark:bg-green-950/60">
+                <Users className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-slate-600">Públicas</p>
@@ -146,8 +206,8 @@ export default function RutinasPage() {
           
           <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-100">
             <div className="flex items-center">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Clock className="h-6 w-6 text-purple-600" />
+              <div className="p-3 bg-purple-100 rounded-lg dark:bg-purple-950/60">
+                <Clock className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-slate-600">Última Actualización</p>
@@ -171,7 +231,7 @@ export default function RutinasPage() {
                 key={t.key}
                 className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex flex-col"
               >
-                <span className="self-start rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">
+                <span className="self-start rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
                   {t.category}
                 </span>
                 <h3 className="mt-2 text-base font-semibold text-slate-900">{t.name}</h3>
@@ -241,7 +301,7 @@ export default function RutinasPage() {
                     const h = historyByRoutine[rutina.id];
                     if (!h || h.total === 0) {
                       return (
-                        <p className="text-sm text-slate-400 mb-4">Sin sesiones todavía</p>
+                        <p className="text-sm text-slate-500 mb-4">Sin sesiones todavía</p>
                       );
                     }
                     return (
@@ -257,13 +317,15 @@ export default function RutinasPage() {
                   <div className="flex items-center space-x-2">
                     <Button
                       className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200 cursor-pointer"
-                      onClick={() => startSession(rutina.id)}
+                      onClick={() => handleStartSession(rutina.id)}
+                      disabled={startingId === rutina.id}
                     >
                       <Play className="h-4 w-4 mr-1" />
-                      Iniciar
+                      {startingId === rutina.id ? "Iniciando…" : "Iniciar"}
                     </Button>
                     <Link
                       href={`/rutinas/${rutina.id}/editar`}
+                      aria-label={`Editar ${rutina.name}`}
                       className="inline-flex items-center justify-center px-3 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors duration-200"
                     >
                       <Edit className="h-4 w-4" />
@@ -274,6 +336,7 @@ export default function RutinasPage() {
                           onClick={() => handleDelete(rutina.id)}
                           disabled={deletingId === rutina.id}
                           title="Confirmar eliminación (las sesiones anteriores se conservan)"
+                          aria-label={`Confirmar eliminación de ${rutina.name}`}
                           className="inline-flex items-center justify-center px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors duration-200 disabled:opacity-50"
                         >
                           <Check className="h-4 w-4" />
@@ -282,6 +345,7 @@ export default function RutinasPage() {
                           onClick={() => setConfirmingId(null)}
                           disabled={deletingId === rutina.id}
                           title="Cancelar"
+                          aria-label="Cancelar eliminación"
                           className="inline-flex items-center justify-center px-3 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors duration-200 disabled:opacity-50"
                         >
                           <X className="h-4 w-4" />
@@ -291,7 +355,8 @@ export default function RutinasPage() {
                       <button
                         onClick={() => handleDelete(rutina.id)}
                         title="Eliminar rutina (conserva su historial)"
-                        className="inline-flex items-center justify-center px-3 py-2 bg-red-100 text-red-700 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors duration-200"
+                        aria-label={`Eliminar ${rutina.name}`}
+                        className="inline-flex items-center justify-center px-3 py-2 bg-red-100 text-red-700 text-sm font-medium rounded-lg hover:bg-red-200 transition-colors duration-200 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-950"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

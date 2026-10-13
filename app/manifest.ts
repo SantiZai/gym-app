@@ -9,6 +9,21 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/",
     scope: "/",
     display: "standalone",
+    lang: "es",
+    dir: "ltr",
+    categories: ["health", "fitness", "lifestyle"],
+    shortcuts: [
+      {
+        name: "Mis rutinas",
+        url: "/rutinas",
+        icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+      },
+      {
+        name: "Mi progreso",
+        url: "/progreso",
+        icons: [{ src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+      },
+    ],
     background_color: "#ffffff",
     theme_color: "#ffffff",
     icons: [

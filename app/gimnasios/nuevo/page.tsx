@@ -28,13 +28,13 @@ const CONTACT_BODY =
   "Quedo a la espera de los pasos para el alta.\n\nGracias!";
 
 const inputClass =
-  "w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30";
+  "w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-base text-slate-900 placeholder-slate-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 md:text-sm";
 
 function Field({ label, children, optional }: { label: string; children: React.ReactNode; optional?: boolean }) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm font-medium text-slate-700">
-        {label} {optional && <span className="font-normal text-slate-400">(opcional)</span>}
+        {label} {optional && <span className="font-normal text-slate-500">(opcional)</span>}
       </span>
       {children}
     </label>
