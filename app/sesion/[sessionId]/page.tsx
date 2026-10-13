@@ -744,7 +744,7 @@ export default function SessionPage() {
             {/* Header fijo: sigue a la nav móvil (var --nav-top) para no quedar tapado */}
             <div
                 className="bg-white border-b sticky z-10 shadow-sm transition-[top] duration-300"
-                style={{ top: "var(--nav-top, 4rem)" }}
+                style={{ top: "var(--nav-top, calc(4rem + env(safe-area-inset-top)))" }}
             >
                 <div className="max-w-4xl mx-auto px-4 py-4">
                     <div className="flex items-center justify-between mb-3">

@@ -138,12 +138,12 @@
    En desktop la nav siempre es visible. */
 :root {
   color-scheme: light;
-  --nav-top: 4rem;
+  --nav-top: calc(4rem + env(safe-area-inset-top));
 }
 
 @media (min-width: 768px) {
   :root {
-    --nav-top: 4rem !important;
+    --nav-top: calc(4rem + env(safe-area-inset-top)) !important;
   }
 }
 
