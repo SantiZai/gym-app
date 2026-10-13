@@ -116,7 +116,7 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <Navbar />
-          <main className="pt-[calc(4rem+env(safe-area-inset-top))]">
+          <main className="pt-[calc(4rem+env(safe-area-inset-top,0px))]">
             {children}
           </main>
           <ActiveSessionBanner />

@@ -133,17 +133,17 @@
    La app usa la escala slate y blanco hardcodeados, así que en .dark
    se invierte la escala acromática. Los acentos de color
    (blue/green/orange/...) y el texto sobre ellos se dejan intactos. */
-/* Offset dinámico de la navbar móvil (auto-hide). La cabecera sticky de
-   sesión lo consume vía `top: var(--nav-top)` para bajar/subir con la nav.
-   En desktop la nav siempre es visible. */
+/* Offset de la navbar (siempre visible). La cabecera sticky de
+   sesión lo consume vía `top: var(--nav-top)`. Incluye la safe-area
+   para que en iPhone el contenido quede debajo de la isla. */
 :root {
   color-scheme: light;
-  --nav-top: calc(4rem + env(safe-area-inset-top));
+  --nav-top: calc(4rem + env(safe-area-inset-top, 0px));
 }
 
 @media (min-width: 768px) {
   :root {
-    --nav-top: calc(4rem + env(safe-area-inset-top)) !important;
+    --nav-top: calc(4rem + env(safe-area-inset-top, 0px)) !important;
   }
 }
 

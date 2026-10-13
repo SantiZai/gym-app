@@ -26,10 +26,6 @@ const navLinks = [
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
-  const lastScrollYRef = useRef(0);
-  const tickingRef = useRef(false);
-  const isOpenRef = useRef(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -45,93 +41,29 @@ export function Navbar() {
     return pathname?.startsWith(href);
   };
 
-  // Detectar scroll para agregar sombra y ocultar/mostrar navbar en mobile.
-  // En iOS el scroll con momentum/bounce dispara muchos eventos: se usa rAF,
-  // umbral mínimo e refs (sin re-suscribir el listener) para evitar flicker.
-  useEffect(() => {
-    isOpenRef.current = isOpen;
-  }, [isOpen]);
-
+  // Solo sombra al scrollear. Sin auto-hide: en iOS el translate de una
+  // barra fixed genera ghosting/blur y deja el logo a medio tapar por la isla.
+  // La nav queda siempre visible (como en desktop).
   useEffect(() => {
     const handleScroll = () => {
-      if (tickingRef.current) return;
-      tickingRef.current = true;
-      requestAnimationFrame(() => {
-        tickingRef.current = false;
-        const currentScrollY = window.scrollY;
-
-        // Bounce de iOS (valores negativos): ignorar.
-        if (currentScrollY < 0) return;
-
-        // Agregar sombra cuando hay scroll
-        setScrolled(currentScrollY > 10);
-
-        // No auto-ocultar con el drawer abierto
-        if (isOpenRef.current) {
-          setIsVisible(true);
-          lastScrollYRef.current = currentScrollY;
-          return;
-        }
-
-        const lastY = lastScrollYRef.current;
-        const delta = currentScrollY - lastY;
-
-        // Si está en el top, siempre mostrar
-        if (currentScrollY < 10) {
-          setIsVisible(true);
-        }
-        // Ignorar micro-movimientos para no parpadear en iOS
-        else if (Math.abs(delta) < 4) {
-          return;
-        }
-        // Si scrollea hacia abajo, ocultar
-        else if (delta > 0 && currentScrollY > 80) {
-          setIsVisible(false);
-        }
-        // Si scrollea hacia arriba, mostrar
-        else if (delta < 0) {
-          setIsVisible(true);
-        }
-
-        lastScrollYRef.current = currentScrollY;
-      });
+      setScrolled(window.scrollY > 10);
     };
-
+    handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Exponer visibilidad real de la nav móvil como var CSS para que los
-  // headers sticky (ej. "Sesión en progreso") bajen/suban junto con la nav
-  // en vez de quedar tapados. En desktop la nav siempre es visible.
-  // Incluye env(safe-area-inset-top) para que en iPhone standalone/sticky
-  // el contenido quede debajo de la isla y no tapado por ella.
+  // Offset para headers sticky: altura de la nav + safe-area de la isla.
+  // Constante porque la nav ya no se auto-oculta.
   useEffect(() => {
-    const syncNavOffset = () => {
-      if (window.matchMedia("(min-width: 768px)").matches) {
-        document.documentElement.style.setProperty(
-          "--nav-top",
-          "calc(4rem + env(safe-area-inset-top))"
-        );
-        return;
-      }
-      document.documentElement.style.setProperty(
-        "--nav-top",
-        isVisible
-          ? "calc(4rem + env(safe-area-inset-top))"
-          : "env(safe-area-inset-top)"
-      );
-    };
-    syncNavOffset();
-    window.addEventListener("resize", syncNavOffset);
-    return () => window.removeEventListener("resize", syncNavOffset);
-  }, [isVisible]);
+    const value = "calc(4rem + env(safe-area-inset-top, 0px))";
+    document.documentElement.style.setProperty("--nav-top", value);
+  }, []);
 
-  // Prevenir scroll del body cuando el menú está abierto y asegurar que navbar sea visible
+  // Prevenir scroll del body cuando el menú está abierto
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
-      setIsVisible(true); // Siempre mostrar navbar cuando el menú está abierto
     } else {
       document.body.style.overflow = "";
     }
@@ -185,33 +117,21 @@ export function Navbar() {
   return (
     <>
       <nav
-        style={{ paddingTop: "env(safe-area-inset-top)" }}
-        className={`fixed top-0 left-0 right-0 z-50 bg-white transition-transform duration-300 will-change-transform ${scrolled ? "shadow-md" : ""
-          } ${isVisible || isOpen ? "translate-y-0" : "-translate-y-full"
-          } md:translate-y-0`}
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+        className={`fixed inset-x-0 top-0 z-50 bg-white border-b border-transparent transition-shadow duration-200 ${scrolled ? "shadow-md border-slate-100" : ""
+          }`}
       >
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          {/* Desktop */}
+          <div className="hidden md:flex items-center justify-between h-16">
             {/* Logo a la izquierda - Desktop */}
-            <Link
-              href="/"
-              className="hidden md:flex items-center space-x-2"
-            >
-              <Image src="/icons/icon.svg" alt="Habitus" width={32} height={32} className="rounded-lg" />
-              <span className="text-xl font-bold text-slate-900">Habitus</span>
-            </Link>
-
-            {/* Logo centrado - Mobile */}
-            <Link
-              href="/"
-              className="flex md:hidden items-center space-x-2 absolute left-1/2 transform -translate-x-1/2"
-            >
+            <Link href="/" className="flex items-center space-x-2">
               <Image src="/icons/icon.svg" alt="Habitus" width={32} height={32} className="rounded-lg" />
               <span className="text-xl font-bold text-slate-900">Habitus</span>
             </Link>
 
             {/* Links y perfil - Desktop */}
-            <div className="hidden md:flex items-center gap-4 lg:gap-6">
+            <div className="flex items-center gap-4 lg:gap-6">
               {user && navLinks.map((link) => (
                 <Link
                   key={link.href}
@@ -288,9 +208,16 @@ export function Navbar() {
                 </Link>
               )}
             </div>
+          </div>
 
-            {/* Acciones - Mobile */}
-            <div className="md:hidden ml-auto flex items-center gap-1">
+          {/* Mobile: grid sin translate para texto nítido en iOS */}
+          <div className="grid md:hidden grid-cols-[1fr_auto_1fr] items-center h-16">
+            <div className="w-10" />
+            <Link href="/" className="flex items-center justify-center space-x-2">
+              <Image src="/icons/icon.svg" alt="Habitus" width={32} height={32} className="rounded-lg" />
+              <span className="text-xl font-bold text-slate-900">Habitus</span>
+            </Link>
+            <div className="flex items-center justify-end gap-1">
               <ThemeToggle />
               {
                 user ? (
@@ -330,8 +257,8 @@ export function Navbar() {
       {/* Menú lateral - Mobile */}
       <div
         style={{
-          paddingTop: "env(safe-area-inset-top)",
-          paddingBottom: "env(safe-area-inset-bottom)",
+          paddingTop: "env(safe-area-inset-top, 0px)",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}
         className={`fixed top-0 right-0 h-[100dvh] w-[280px] bg-white z-50 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out md:hidden ${isOpen ? "translate-x-0" : "translate-x-full"
           }`}

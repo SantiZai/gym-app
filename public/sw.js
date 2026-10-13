@@ -5,7 +5,7 @@
  * Versioneá CACHE_NAME en cada cambio de esta estrategia.
  */
 
-const CACHE_NAME = "habitus-v1";
+const CACHE_NAME = "habitus-v2";
 const PRECACHE = [
   "/offline",
   "/",
