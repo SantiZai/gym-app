@@ -20,9 +20,52 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Habitus - Entrenamiento con propósito",
+  metadataBase: new URL("https://habitus.lat"),
+  title: {
+    default: "Habitus - Entrenamiento con propósito",
+    template: "%s | Habitus",
+  },
   description: "Gestiona tus rutinas, ejercicios y progreso. Entrenamiento con propósito.",
+  keywords: ["habitus", "gimnasio", "rutinas", "entrenamiento", "progreso", "fitness"],
+  authors: [{ name: "Habitus" }],
+  creator: "Habitus",
   applicationName: "Habitus",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "es_AR",
+    url: "https://habitus.lat/",
+    siteName: "Habitus",
+    title: "Habitus - Entrenamiento con propósito",
+    description: "Gestiona tus rutinas, ejercicios y progreso. Entrenamiento con propósito.",
+    images: [
+      {
+        url: "/icons/icon-512.png",
+        width: 512,
+        height: 512,
+        alt: "Habitus",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: "Habitus - Entrenamiento con propósito",
+    description: "Gestiona tus rutinas, ejercicios y progreso. Entrenamiento con propósito.",
+    images: ["/icons/icon-512.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   appleWebApp: {
     capable: true,
     title: "Habitus",
@@ -58,7 +101,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", inter.variable)} suppressHydrationWarning>
+    <html lang="es" className={cn("font-sans", inter.variable)} suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

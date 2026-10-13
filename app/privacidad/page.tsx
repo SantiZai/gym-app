@@ -4,6 +4,9 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Política de Privacidad - Habitus",
   description: "Cómo Habitus recolecta, usa y protege tus datos.",
+  alternates: {
+    canonical: "/privacidad",
+  },
 };
 
 const SECTIONS: { title: string; body: string[] }[] = [
