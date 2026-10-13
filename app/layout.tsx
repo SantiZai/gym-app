@@ -75,7 +75,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "Habitus",
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
   },
   icons: {
     icon: [
@@ -98,7 +98,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#ffffff",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f172a" },
+  ],
 };
 
 export default function RootLayout({
@@ -113,7 +116,7 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <Navbar />
-          <main className="pt-16">
+          <main className="pt-[calc(4rem+env(safe-area-inset-top))]">
             {children}
           </main>
           <ActiveSessionBanner />

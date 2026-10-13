@@ -27,7 +27,9 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
+  const lastScrollYRef = useRef(0);
+  const tickingRef = useRef(false);
+  const isOpenRef = useRef(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -43,49 +45,81 @@ export function Navbar() {
     return pathname?.startsWith(href);
   };
 
-  // Detectar scroll para agregar sombra y ocultar/mostrar navbar en mobile
+  // Detectar scroll para agregar sombra y ocultar/mostrar navbar en mobile.
+  // En iOS el scroll con momentum/bounce dispara muchos eventos: se usa rAF,
+  // umbral mínimo e refs (sin re-suscribir el listener) para evitar flicker.
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
+
   useEffect(() => {
     const handleScroll = () => {
-      const currentScrollY = window.scrollY;
+      if (tickingRef.current) return;
+      tickingRef.current = true;
+      requestAnimationFrame(() => {
+        tickingRef.current = false;
+        const currentScrollY = window.scrollY;
 
-      // Agregar sombra cuando hay scroll
-      setScrolled(currentScrollY > 10);
+        // Bounce de iOS (valores negativos): ignorar.
+        if (currentScrollY < 0) return;
 
-      // Solo aplicar auto-hide en mobile (cuando el menú no está abierto)
-      if (!isOpen) {
+        // Agregar sombra cuando hay scroll
+        setScrolled(currentScrollY > 10);
+
+        // No auto-ocultar con el drawer abierto
+        if (isOpenRef.current) {
+          setIsVisible(true);
+          lastScrollYRef.current = currentScrollY;
+          return;
+        }
+
+        const lastY = lastScrollYRef.current;
+        const delta = currentScrollY - lastY;
+
         // Si está en el top, siempre mostrar
         if (currentScrollY < 10) {
           setIsVisible(true);
         }
+        // Ignorar micro-movimientos para no parpadear en iOS
+        else if (Math.abs(delta) < 4) {
+          return;
+        }
         // Si scrollea hacia abajo, ocultar
-        else if (currentScrollY > lastScrollY && currentScrollY > 80) {
+        else if (delta > 0 && currentScrollY > 80) {
           setIsVisible(false);
         }
         // Si scrollea hacia arriba, mostrar
-        else if (currentScrollY < lastScrollY) {
+        else if (delta < 0) {
           setIsVisible(true);
         }
-      }
 
-      setLastScrollY(currentScrollY);
+        lastScrollYRef.current = currentScrollY;
+      });
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [lastScrollY, isOpen]);
+  }, []);
 
   // Exponer visibilidad real de la nav móvil como var CSS para que los
   // headers sticky (ej. "Sesión en progreso") bajen/suban junto con la nav
   // en vez de quedar tapados. En desktop la nav siempre es visible.
+  // Incluye env(safe-area-inset-top) para que en iPhone standalone/sticky
+  // el contenido quede debajo de la isla y no tapado por ella.
   useEffect(() => {
     const syncNavOffset = () => {
       if (window.matchMedia("(min-width: 768px)").matches) {
-        document.documentElement.style.setProperty("--nav-top", "4rem");
+        document.documentElement.style.setProperty(
+          "--nav-top",
+          "calc(4rem + env(safe-area-inset-top))"
+        );
         return;
       }
       document.documentElement.style.setProperty(
         "--nav-top",
-        isVisible ? "4rem" : "0rem"
+        isVisible
+          ? "calc(4rem + env(safe-area-inset-top))"
+          : "env(safe-area-inset-top)"
       );
     };
     syncNavOffset();
@@ -151,8 +185,9 @@ export function Navbar() {
   return (
     <>
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 bg-white transition-all duration-300 ${scrolled ? "shadow-md" : ""
-          } ${isVisible && !isOpen ? "translate-y-0" : "-translate-y-full"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+        className={`fixed top-0 left-0 right-0 z-50 bg-white transition-transform duration-300 will-change-transform ${scrolled ? "shadow-md" : ""
+          } ${isVisible || isOpen ? "translate-y-0" : "-translate-y-full"
           } md:translate-y-0`}
       >
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -294,7 +329,11 @@ export function Navbar() {
 
       {/* Menú lateral - Mobile */}
       <div
-        className={`fixed top-0 right-0 h-full w-[280px] bg-white z-50 shadow-2xl transform transition-transform duration-300 ease-in-out md:hidden ${isOpen ? "translate-x-0" : "translate-x-full"
+        style={{
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+        className={`fixed top-0 right-0 h-[100dvh] w-[280px] bg-white z-50 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out md:hidden ${isOpen ? "translate-x-0" : "translate-x-full"
           }`}
       >
         {/* Header del menú */}
@@ -313,7 +352,7 @@ export function Navbar() {
         </div>
 
         {/* Links del menú */}
-        <nav className="p-4">
+        <nav className="p-4 flex-1 overflow-y-auto">
           <ul className="space-y-2">
             {navLinks.map((link) => (
               <li key={link.href}>
@@ -335,7 +374,7 @@ export function Navbar() {
         </nav>
 
         {/* Footer del menú */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-white">
+        <div className="mt-auto p-4 border-t bg-white">
           {user ? (
             <div className="space-y-2">
               <CafecitoMenuCard onClick={() => setIsOpen(false)} />
