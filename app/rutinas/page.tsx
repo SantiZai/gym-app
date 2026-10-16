@@ -240,7 +240,7 @@ export default function RutinasPage() {
                 <button
                   onClick={() => handleUseTemplate(t.key)}
                   disabled={usingTemplate !== null}
-                  className="mt-3 w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                  className="mt-3 w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
                 >
                   {usingTemplate === t.key ? "Creando…" : "Usar plantilla"}
                 </button>

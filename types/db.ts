@@ -117,6 +117,40 @@ export interface Gym {
     longitude: number | null;
     created_by: string | null;
     created_at: string;
+    pass_mode?: PassMode | null; // rolling = días corridos, calendar = 1º a fin de mes
+    pass_days?: number | null; // solo rolling (1-365)
+    pass_default_amount?: number | null; // monto por defecto para prefill
+}
+
+// Pases / cuotas manuales (sin pasarela de pagos)
+export type PassMode = "rolling" | "calendar";
+
+export type PassStatus = "vigente" | "por_vencer" | "vencido" | "sin_pase";
+
+export interface GymManualClient {
+    id: string;
+    gym_id: string;
+    name: string;
+    phone: string | null;
+    email: string | null;
+    notes: string | null;
+    created_by: string | null;
+    created_at: string;
+}
+
+export interface GymPassPayment {
+    id: string;
+    gym_id: string;
+    user_id: string | null;
+    manual_client_id: string | null;
+    client_name: string | null; // snapshot para ex-miembros / manuales borrados
+    amount: number | null;
+    paid_on: string; // YYYY-MM-DD
+    period_start: string; // YYYY-MM-DD
+    period_end: string; // YYYY-MM-DD
+    notes: string | null;
+    created_by: string | null;
+    created_at: string;
 }
 
 export interface GymMember {

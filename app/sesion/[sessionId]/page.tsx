@@ -37,7 +37,6 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { toast } from "sonner";
 import {
     CheckCircle2,
-    Circle,
     Timer,
     Dumbbell,
     AlertCircle,
@@ -501,42 +500,54 @@ export default function SessionPage() {
         };
     }, []);
 
+    // Guarda lo tipeado que aún está en debounce (500ms sin disparar).
+    // Se usa al ocultar la app y antes de finalizar: si no, ese cambio
+    // "se borraría de la nada" y el resumen saldría incompleto.
+    const flushPendingSerieWrites = useCallback(async () => {
+        const pendingIds = Object.keys(debounceTimers.current);
+        if (pendingIds.length === 0) return;
+        const values = serieValuesRef.current;
+        const exercises = routineExercisesRef.current;
+        const jobs: Promise<unknown>[] = [];
+        for (const serieId of pendingIds) {
+            const timer = debounceTimers.current[serieId];
+            if (timer) clearTimeout(timer);
+            delete debounceTimers.current[serieId];
+            const v = values[serieId];
+            if (!v) continue;
+            const owner = exercises.find((re) => re.series.some((s) => s.id === serieId));
+            if (!owner) continue;
+            jobs.push(updateSerieValueInDB(serieId, owner.exercise.id, v.weight, v.reps));
+        }
+        await Promise.all(jobs);
+    }, [updateSerieValueInDB]);
+
     // Al ocultar la app (minimizar, cambiar de app, bloquear pantalla),
     // forzar el guardado de lo tipeado pendiente: el debounce de 500ms
     // no llegaría a disparar y ese cambio "se borraría de la nada".
     useEffect(() => {
-        const flushPending = () => {
-            const pendingIds = Object.keys(debounceTimers.current);
-            if (pendingIds.length === 0) return;
-            const values = serieValuesRef.current;
-            const exercises = routineExercisesRef.current;
-            for (const serieId of pendingIds) {
-                const timer = debounceTimers.current[serieId];
-                if (timer) clearTimeout(timer);
-                delete debounceTimers.current[serieId];
-                const v = values[serieId];
-                if (!v) continue;
-                const owner = exercises.find((re) => re.series.some((s) => s.id === serieId));
-                if (!owner) continue;
-                void updateSerieValueInDB(serieId, owner.exercise.id, v.weight, v.reps);
-            }
-        };
         const onHidden = () => {
-            if (document.visibilityState === "hidden") flushPending();
+            if (document.visibilityState === "hidden") void flushPendingSerieWrites();
+        };
+        const onPageHide = () => {
+            void flushPendingSerieWrites();
         };
         document.addEventListener("visibilitychange", onHidden);
-        window.addEventListener("pagehide", flushPending);
+        window.addEventListener("pagehide", onPageHide);
         return () => {
             document.removeEventListener("visibilitychange", onHidden);
-            window.removeEventListener("pagehide", flushPending);
+            window.removeEventListener("pagehide", onPageHide);
         };
-    }, [updateSerieValueInDB]);
+    }, [flushPendingSerieWrites]);
 
     // Finalizar sesión y mostrar resumen
     const handleFinishSession = async () => {
         try {
             setFinishing(true);
             stopRestTimer();
+            // Primero persiste lo tipeado a último momento para que el
+            // resumen (volumen/series) lo incluya.
+            await flushPendingSerieWrites();
             const result = await finishSession(sessionId);
             clearActiveSession(sessionId);
             clearAllSerieDrafts(sessionId);
@@ -582,12 +593,12 @@ export default function SessionPage() {
     const getSerieTypeClass = (type: string) => {
         switch (type) {
             case "warm-up":
-                return "bg-yellow-100 text-yellow-800";
+                return "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300";
             case "dropset":
             case "otro":
-                return "bg-slate-200 text-slate-700";
+                return "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300";
             default:
-                return "bg-blue-100 text-blue-700";
+                return "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300";
         }
     };
 
@@ -670,7 +681,7 @@ export default function SessionPage() {
         ];
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-8">
-                <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border p-8 text-center">
+                <div className="w-full max-w-md bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-8 text-center">
                     <div className="mx-auto w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
                         <Trophy className="h-8 w-8 text-amber-500" aria-hidden />
                     </div>
@@ -710,7 +721,7 @@ export default function SessionPage() {
     if (session.status === "finished") {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-8">
-                <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border p-8 text-center">
+                <div className="w-full max-w-md bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-8 text-center">
                     <div className="mx-auto w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
                         <Trophy className="h-8 w-8 text-green-600" aria-hidden />
                     </div>
@@ -740,59 +751,46 @@ export default function SessionPage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 pb-20 overscroll-none">
-            {/* Header fijo: sigue a la nav móvil (var --nav-top) para no quedar tapado */}
+        <div className="min-h-screen bg-slate-50 pb-28 overscroll-none">
+            {/* Header fijo minimalista: sigue a la nav móvil (var --nav-top) para no quedar tapado */}
             <div
-                className="bg-white border-b sticky z-10 shadow-sm transition-[top] duration-300"
+                className="bg-white/95 backdrop-blur border-b border-slate-200/70 sticky z-10 dark:bg-slate-950/90 dark:border-white/10 transition-[top] duration-300"
                 style={{ top: "var(--nav-top, calc(4rem + env(safe-area-inset-top)))" }}
             >
-                <div className="max-w-4xl mx-auto px-4 py-4">
-                    <div className="flex items-center justify-between mb-3">
-                        <div>
-                            <h1 className="text-2xl font-bold text-slate-900">
+                <div className="max-w-4xl mx-auto px-4 pt-3 pb-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                            <h1 className="truncate text-base font-bold text-slate-900">
                                 Sesión en progreso
                             </h1>
-                            <p className="text-sm text-slate-500">
-                                {routineExercises.length} ejercicios
+                            <p className="text-xs text-slate-500">
+                                {completedCount}/{totalSeries} series · {routineExercises.length} {routineExercises.length === 1 ? "ejercicio" : "ejercicios"}
                             </p>
                         </div>
-                        <div className="flex flex-col items-end gap-1.5">
-                            <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg dark:bg-blue-950/50">
-                                <Timer className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                <span className="text-xl font-mono font-bold text-blue-600 dark:text-blue-300">
+                        <div className="flex shrink-0 items-center gap-2">
+                            {(!online || pending > 0) && (
+                                <span
+                                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${!online ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600"}`}
+                                    title={!online ? "Sin conexión" : "Sincronizando"}
+                                >
+                                    {!online ? (pending > 0 ? `Offline · ${pending}` : "Offline") : `${pending}…`}
+                                </span>
+                            )}
+                            <div className="flex items-center gap-1.5 rounded-full bg-blue-100/70 px-3 py-1.5 dark:bg-blue-950/60">
+                                <Timer className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                <span className="font-mono text-sm font-bold tabular-nums text-blue-700 dark:text-blue-300">
                                     {formatElapsedTime(elapsedTime)}
                                 </span>
                             </div>
-                            {!online && (
-                                <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-                                    Sin conexión{pending > 0 ? ` · ${pending} por sincronizar` : " · se guarda local"}
-                                </span>
-                            )}
-                            {online && pending > 0 && (
-                                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                                    Sincronizando {pending}…
-                                </span>
-                            )}
                         </div>
                     </div>
-
-                    {/* Barra de progreso */}
-                    <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                            <span className="text-slate-600">Progreso</span>
-                            <span className="font-semibold text-slate-900">
-                                {completedCount} /{" "}
-                                {totalSeries}{" "}
-                                series
-                            </span>
-                        </div>
-                        <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                            <div
-                                className="bg-gradient-to-r from-blue-500 to-blue-600 h-full transition-all duration-500 ease-out"
-                                style={{ width: `${progress}%` }}
-                            />
-                        </div>
-                    </div>
+                </div>
+                {/* Progreso: línea fina al pie del header */}
+                <div className="h-1 w-full bg-slate-100 dark:bg-white/10">
+                    <div
+                        className="h-full rounded-r-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500 ease-out"
+                        style={{ width: `${progress}%` }}
+                    />
                 </div>
             </div>
 
@@ -810,57 +808,55 @@ export default function SessionPage() {
                     // obtener el "last performed" para este ejercicio (si existe)
                     const lastPerformed = lastPerformedByExercise[routineExercise.exercise.id];
 
+                    const done = totalExerciseSeries > 0 && exerciseCompletedSeries === totalExerciseSeries;
                     return (
                         <div
                             key={routineExercise.id}
-                            className="bg-white rounded-lg shadow-sm border overflow-hidden"
+                            className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200 dark:ring-white/10"
                         >
                             {/* Header del ejercicio */}
-                            <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-4 border-b border-slate-200/60 dark:border-white/10">
+                            <div className="p-4 sm:p-5">
                                 <div className="flex items-start justify-between gap-3">
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-3">
-                                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
-                                                {idx + 1}
-                                            </span>
-                                            <div className="min-w-0">
-                                                <h3 className="text-lg font-bold text-slate-900 break-words">
-                                                    {routineExercise.exercise.name}
-                                                </h3>
-                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-slate-600">
-                                                    <span className="flex items-center gap-1">
-                                                        <Dumbbell className="h-4 w-4 shrink-0" />
-                                                        {muscleName(routineExercise.exercise.primary_muscle_id)}
+                                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${done ? "bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-300" : "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"}`}>
+                                            {done ? <CheckCircle2 className="h-5 w-5" aria-hidden /> : (idx + 1)}
+                                        </span>
+                                        <div className="min-w-0 flex-1">
+                                            <h3 className="break-words text-base font-bold text-slate-900">
+                                                {routineExercise.exercise.name}
+                                            </h3>
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                                                    <Dumbbell className="h-3 w-3 shrink-0" />
+                                                    {muscleName(routineExercise.exercise.primary_muscle_id)}
+                                                </span>
+                                                {routineExercise.exercise.equipment && (
+                                                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">
+                                                        {equipmentLabel(routineExercise.exercise.equipment) ?? routineExercise.exercise.equipment}
                                                     </span>
-                                                    {routineExercise.exercise.equipment && (
-                                                        <span className="truncate">• {equipmentLabel(routineExercise.exercise.equipment) ?? routineExercise.exercise.equipment}</span>
-                                                    )}
-                                                    {/* mostrar última vez en header si existe */}
-                                                    {lastPerformed && (
-                                                        <span className="w-full text-xs text-slate-500 sm:w-auto sm:ml-3 sm:mt-0">
-                                                            Última: {lastPerformed.weight_used ?? "0"} kg × {lastPerformed.reps_performed ?? "0"} ({lastPerformed.completed_at ? new Date(lastPerformed.completed_at).toLocaleDateString() : "—"})
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                )}
+                                                {lastPerformed && (
+                                                    <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                                                        Últ: {lastPerformed.weight_used ?? "—"} kg × {lastPerformed.reps_performed ?? "—"}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="text-right shrink-0">
-                                        <span className="text-sm font-semibold text-slate-900">
-                                            {exerciseCompletedSeries} / {totalExerciseSeries}
-                                        </span>
-                                        <div className="w-20 bg-slate-200 rounded-full h-2 mt-1">
-                                            <div
-                                                className="bg-green-500 h-full rounded-full transition-all duration-300"
-                                                style={{ width: `${exerciseProgress}%` }}
-                                            />
-                                        </div>
-                                    </div>
+                                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ${done ? "bg-green-100 text-green-700 dark:bg-green-950/60 dark:text-green-300" : "bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300"}`}>
+                                        {exerciseCompletedSeries}/{totalExerciseSeries}
+                                    </span>
+                                </div>
+                                <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                                    <div
+                                        className={`h-full rounded-full transition-all duration-300 ${done ? "bg-green-500" : "bg-blue-500"}`}
+                                        style={{ width: `${exerciseProgress}%` }}
+                                    />
                                 </div>
                             </div>
 
-                            {/* Series */}
-                            <div className="divide-y divide-slate-200/60 dark:divide-white/10">
+                            {/* Series: divisores hairline tranquis, sin tarjetas */}
+                            <div className="divide-y divide-slate-100 border-t border-slate-100 dark:divide-white/5 dark:border-white/10">
                                 {routineExercise.series.map((serie, serieIdx) => {
                                     const completed = isSerieCompleted(serie.id);
 
@@ -870,85 +866,86 @@ export default function SessionPage() {
                                     return (
                                         <div
                                             key={serie.id}
-                                            className={`px-4 py-3 transition-colors ${completed
-                                                ? "bg-green-500/10"
-                                                : "bg-white"
+                                            className={`px-4 py-3 transition-colors sm:px-5 ${completed
+                                                ? "bg-green-50/70 dark:bg-green-950/20"
+                                                : ""
                                                 }`}
                                         >
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            handleCompleteSerie(
-                                                                serie,
-                                                                routineExercise.exercise.id,
-                                                                !completed
-                                                            );
-                                                        }}
-                                                        aria-pressed={completed}
-                                                        aria-label={`${completed ? "Desmarcar" : "Completar"} serie ${serieIdx + 1}`}
-                                                        className="-m-2 rounded-full p-2"
-                                                    >
-                                                        {completed ? (
-                                                            <CheckCircle2 className="h-6 w-6 text-green-600 flex-shrink-0" />
-                                                        ) : (
-                                                            <Circle className="h-6 w-6 text-slate-300 flex-shrink-0" />
-                                                        )}
-                                                    </button>
-                                                    <span className="font-semibold text-slate-700">
-                                                        Serie {serieIdx + 1}
-                                                    </span>
-                                                    <select
-                                                        value={serie.type}
-                                                        onChange={(e) => handleSerieTypeChange(routineExercise.id, serie.id, e.target.value as Serie["type"])}
-                                                        aria-label={`Tipo serie ${serieIdx + 1}`}
-                                                        className={`cursor-pointer rounded px-2 py-1 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${getSerieTypeClass(serie.type)}`}
-                                                    >
-                                                        <option value="warm-up">Calentamiento</option>
-                                                        <option value="normal">Normal</option>
-                                                        <option value="dropset">Dropset</option>
-                                                        <option value="otro">Otro</option>
-                                                    </select>
+                                            <div className="flex items-center gap-2.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        handleCompleteSerie(
+                                                            serie,
+                                                            routineExercise.exercise.id,
+                                                            !completed
+                                                        );
+                                                    }}
+                                                    aria-pressed={completed}
+                                                    aria-label={`${completed ? "Desmarcar" : "Completar"} serie ${serieIdx + 1}`}
+                                                    title={completed ? "Desmarcar serie" : "Marcar serie como hecha"}
+                                                    className={`flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full transition-all hover:scale-105 active:scale-95 ${completed
+                                                        ? "bg-green-500 text-white shadow-sm"
+                                                        : "bg-white text-slate-300 shadow-sm ring-2 ring-slate-300 hover:text-blue-500 hover:ring-blue-400 dark:bg-white/10 dark:text-slate-600 dark:ring-slate-600 dark:hover:text-blue-400 dark:hover:ring-blue-500"
+                                                        }`}
+                                                >
+                                                    <CheckCircle2 className="h-6 w-6" aria-hidden />
+                                                </button>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                        <span className={`font-mono text-sm font-bold tabular-nums ${completed ? "text-green-700 dark:text-green-300" : "text-slate-700 dark:text-slate-200"}`}>
+                                                            S{serieIdx + 1}
+                                                        </span>
+                                                        <select
+                                                            value={serie.type}
+                                                            onChange={(e) => handleSerieTypeChange(routineExercise.id, serie.id, e.target.value as Serie["type"])}
+                                                            aria-label={`Tipo serie ${serieIdx + 1}`}
+                                                            className={`cursor-pointer rounded-full px-2 py-0.5 text-[11px] font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 ${getSerieTypeClass(serie.type)}`}
+                                                        >
+                                                            <option value="warm-up">Calentamiento</option>
+                                                            <option value="normal">Normal</option>
+                                                            <option value="dropset">Dropset</option>
+                                                            <option value="otro">Otro</option>
+                                                        </select>
+                                                    </div>
+                                                    {!completed && (serie.weight == null || serie.reps == null) && lastPerformed && (
+                                                        <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+                                                            Últ: {lastPerformed.weight_used ?? "—"} kg × {lastPerformed.reps_performed ?? "—"}
+                                                        </p>
+                                                    )}
                                                 </div>
-                                                {!completed && (serie.weight == null || serie.reps == null) && lastPerformed && (
-                                                    <span className="shrink-0 text-xs text-slate-500">
-                                                        Últ: {lastPerformed.weight_used ?? "—"} kg × {lastPerformed.reps_performed ?? "—"}
-                                                    </span>
-                                                )}
-                                            </div>
-
-                                            <div className="mt-3 flex items-center justify-center gap-5">
-                                                <div className="flex items-center gap-2">
-                                                    <StepperInput
-                                                        value={currentValues.weight}
-                                                        onChange={(v) => handleSerieValueChange(serie.id, routineExercise.exercise.id, 'weight', v)}
-                                                        step={2.5}
-                                                        inputMode="decimal"
-                                                        ariaLabel={`Peso serie ${serieIdx + 1}`}
-                                                        placeholder={serie.weight != null ? String(serie.weight) : (lastPerformed?.weight_used != null ? String(lastPerformed.weight_used) : "0")}
-                                                        inputWidthClass="w-20"
-                                                    />
-                                                    <span className="text-sm text-slate-600">kg</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <StepperInput
-                                                        value={currentValues.reps}
-                                                        onChange={(v) => handleSerieValueChange(serie.id, routineExercise.exercise.id, 'reps', v)}
-                                                        step={1}
-                                                        inputMode="numeric"
-                                                        ariaLabel={`Repeticiones serie ${serieIdx + 1}`}
-                                                        placeholder={serie.reps != null ? String(serie.reps) : (lastPerformed?.reps_performed != null ? String(lastPerformed.reps_performed) : "0")}
-                                                        inputWidthClass="w-20"
-                                                    />
-                                                    <span className="text-sm text-slate-600">reps</span>
+                                                <div className="flex shrink-0 items-start gap-2">
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <StepperInput
+                                                            value={currentValues.weight}
+                                                            onChange={(v) => handleSerieValueChange(serie.id, routineExercise.exercise.id, 'weight', v)}
+                                                            step={2.5}
+                                                            inputMode="decimal"
+                                                            ariaLabel={`Peso serie ${serieIdx + 1}`}
+                                                            placeholder={serie.weight != null ? String(serie.weight) : (lastPerformed?.weight_used != null ? String(lastPerformed.weight_used) : "0")}
+                                                            inputWidthClass="w-[72px]"
+                                                        />
+                                                        <span className="text-[11px] font-medium text-slate-400">kg</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <StepperInput
+                                                            value={currentValues.reps}
+                                                            onChange={(v) => handleSerieValueChange(serie.id, routineExercise.exercise.id, 'reps', v)}
+                                                            step={1}
+                                                            inputMode="numeric"
+                                                            ariaLabel={`Repeticiones serie ${serieIdx + 1}`}
+                                                            placeholder={serie.reps != null ? String(serie.reps) : (lastPerformed?.reps_performed != null ? String(lastPerformed.reps_performed) : "0")}
+                                                            inputWidthClass="w-[72px]"
+                                                        />
+                                                        <span className="text-[11px] font-medium text-slate-400">reps</span>
+                                                    </div>
                                                 </div>
                                             </div>
 
                                             {/* Notas de la serie */}
                                             {serie.notes && (
-                                                <p className="mt-2 text-center text-sm text-slate-600">
-                                                    💡 {serie.notes}
+                                                <p className="mt-1.5 truncate px-12 text-xs text-slate-400 dark:text-slate-500" title={serie.notes}>
+                                                    {serie.notes}
                                                 </p>
                                             )}
                                         </div>
@@ -988,22 +985,22 @@ export default function SessionPage() {
             )}
 
             {/* Footer fijo con acciones */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg pb-[env(safe-area-inset-bottom)] dark:bg-slate-900 dark:border-white/10">
-                <div className="max-w-4xl mx-auto px-4 py-4 flex gap-3">
+            <div className="fixed bottom-0 left-0 right-0 border-t border-slate-200/70 bg-white/95 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] backdrop-blur pb-[env(safe-area-inset-bottom)] dark:bg-slate-950/90 dark:border-white/10">
+                <div className="mx-auto flex max-w-4xl gap-2.5 px-4 py-3">
                     <Button
                         variant="outline"
-                        className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                        className="h-11 flex-1 rounded-xl border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/40"
                         onClick={() => setConfirmandoCancelacion(true)}
                         disabled={cancelling || finishing}
                     >
-                        {cancelling ? "Cancelando..." : "Cancelar Sesión"}
+                        {cancelling ? "Cancelando…" : "Cancelar"}
                     </Button>
                     <Button
-                        className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold"
+                        className="h-11 flex-1 rounded-xl bg-green-600 font-semibold text-white shadow-sm hover:bg-green-700"
                         onClick={handleFinishSession}
                         disabled={finishing || cancelling}
                     >
-                        {finishing ? "Finalizando..." : "Finalizar Sesión"}
+                        {finishing ? "Finalizando…" : `Finalizar${completedCount > 0 ? ` · ${completedCount}/${totalSeries}` : ""}`}
                     </Button>
                 </div>
             </div>

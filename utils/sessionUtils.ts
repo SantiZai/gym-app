@@ -354,70 +354,59 @@ export function formatSessionDuration(
   return "—";
 }
 
-// Analizar sesión y actualizar series de la rutina basado en progreso
+// Analizar sesión y actualizar series de la rutina basado en progreso.
+// Por lotes: 1 fetch de originales + updates en paralelo. Antes era 1 SELECT
+// secuencial por serie (+ UPDATE siempre, porque comparaba number vs string)
+// → finalizar tardaba N roundtrips.
 async function analyzeAndUpdateRoutine(sessionId: string) {
   const supabase = await createClient();
 
-  // Obtener session_series completadas
+  // Obtener session_series completadas (solo columnas necesarias)
   const { data: sessionSeries, error: sessionSeriesError } = await supabase
     .from("session_series")
-    .select("*")
+    .select("serie_id,weight_used,reps_performed")
     .eq("session_id", sessionId)
     .eq("completed", true);
 
   if (sessionSeriesError) throw sessionSeriesError;
   if (!sessionSeries || sessionSeries.length === 0) return;
 
-  // Agrupar por serie_id
-  const seriesMap = new Map<string, SessionSerie[]>();
-  sessionSeries.forEach((ss) => {
-    if (ss.serie_id) {
-      if (!seriesMap.has(ss.serie_id)) {
-        seriesMap.set(ss.serie_id, []);
-      }
-      seriesMap.get(ss.serie_id)!.push(ss as SessionSerie);
+  // Último valor por serie (puede haber filas optimistas duplicadas)
+  const latest = new Map<string, { weight_used: number | null; reps_performed: number | null }>();
+  const rows = sessionSeries as { serie_id: string | null; weight_used: number | null; reps_performed: number | null }[];
+  for (const ss of rows) {
+    if (ss.serie_id) latest.set(ss.serie_id, { weight_used: ss.weight_used, reps_performed: ss.reps_performed });
+  }
+  if (latest.size === 0) return;
+
+  // 1 solo fetch de las series originales
+  const ids = [...latest.keys()];
+  const { data: originals, error: originalsError } = await supabase
+    .from("series")
+    .select("id,weight,reps")
+    .in("id", ids);
+
+  if (originalsError) throw originalsError;
+  const byId = new Map(((originals ?? []) as { id: string; weight: unknown; reps: unknown }[]).map((o) => [o.id, o]));
+
+  // Solo actualizar lo que realmente cambió (comparación normalizada:
+  // la rutina guarda strings y la sesión numbers → String() en ambos lados)
+  const jobs: PromiseLike<unknown>[] = [];
+  for (const [serieId, ss] of latest) {
+    const orig = byId.get(serieId);
+    if (!orig) continue;
+    const updates: { weight?: number | null; reps?: number | null } = {};
+    if (ss.weight_used != null && String(ss.weight_used) !== String(orig.weight ?? "")) {
+      updates.weight = ss.weight_used;
     }
-  });
-
-  // Para cada serie original, verificar si hay mejoras consistentes
-  for (const [serieId, completedSeries] of seriesMap.entries()) {
-    // Si solo hay una sesión registrada, usar esos datos
-    if (completedSeries.length === 1) {
-      const ss = completedSeries[0];
-
-      // Obtener la serie original
-      const { data: originalSerie, error: serieError } = await supabase
-        .from("series")
-        .select("*")
-        .eq("id", serieId)
-        .single();
-
-      if (serieError || !originalSerie) continue;
-
-      // Actualizar si hay cambios significativos
-      const updates: { weight?: number | null; reps?: number | null } = {};
-      let hasChanges = false;
-
-      // Actualizar peso si cambió
-      if (ss.weight_used !== null && ss.weight_used !== originalSerie.weight) {
-        updates.weight = ss.weight_used;
-        hasChanges = true;
-      }
-
-      // Actualizar reps si cambió
-      if (ss.reps_performed !== null && ss.reps_performed !== originalSerie.reps) {
-        updates.reps = ss.reps_performed;
-        hasChanges = true;
-      }
-
-      if (hasChanges) {
-        await supabase
-          .from("series")
-          .update(updates)
-          .eq("id", serieId);
-      }
+    if (ss.reps_performed != null && String(ss.reps_performed) !== String(orig.reps ?? "")) {
+      updates.reps = ss.reps_performed;
+    }
+    if (Object.keys(updates).length > 0) {
+      jobs.push(supabase.from("series").update(updates).eq("id", serieId));
     }
   }
+  if (jobs.length > 0) await Promise.all(jobs);
 }
 
 // Cancelar sesión

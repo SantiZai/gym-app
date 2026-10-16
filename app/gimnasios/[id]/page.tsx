@@ -44,6 +44,10 @@ import { getUserRoutines } from "@/utils/routineUtils";
 import type { Gym, GymMember, GymMemberWithProfile, GymTrainerWithProfile, Routine } from "@/types/db";
 import { formatScheduleLines } from "@/lib/gymSchedule";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { GymPasses } from "@/components/gym/GymPasses";
+import { GymCash } from "@/components/gym/GymCash";
+import { getManualClients, deleteManualClient } from "@/utils/gymPassUtils";
+import type { GymManualClient } from "@/types/db";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -51,12 +55,14 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { cn } from "cn";
 
-type TabKey = "rutinas" | "profesores" | "miembros";
+type TabKey = "rutinas" | "profesores" | "miembros" | "pases" | "caja";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "rutinas", label: "Rutinas" },
   { key: "profesores", label: "Profesores" },
   { key: "miembros", label: "Miembros" },
+  { key: "pases", label: "Pases" },
+  { key: "caja", label: "Caja" },
 ];
 
 const ROLE_LABEL: Record<string, string> = { owner: "Dueño", admin: "Admin", member: "Miembro" };
@@ -85,12 +91,15 @@ export default function GimnasioPage() {
 
   const [gym, setGym] = useState<Gym | null>(null);
   const [members, setMembers] = useState<GymMemberWithProfile[]>([]);
+  const [manualClients, setManualClients] = useState<GymManualClient[]>([]);
   const [trainers, setTrainers] = useState<GymTrainerWithProfile[]>([]);
   const [routines, setRoutines] = useState<GymRoutineItem[]>([]);
   const [membership, setMembership] = useState<GymMember | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>("rutinas");
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [deleteManualTarget, setDeleteManualTarget] = useState<GymManualClient | null>(null);
+  const [deletingManual, setDeletingManual] = useState(false);
 
   // v2.0: gestión
   const [email, setEmail] = useState("");
@@ -108,14 +117,16 @@ export default function GimnasioPage() {
 
   const load = useCallback(async () => {
     try {
-      const [g, m, t, r] = await Promise.all([
+      const [g, m, t, r, mans] = await Promise.all([
         getGymById(gymId),
         getGymMembers(gymId),
         getGymTrainers(gymId),
         getGymRoutines(gymId),
+        getManualClients(gymId).catch(() => [] as GymManualClient[]),
       ]);
       setGym(g);
       setMembers(m);
+      setManualClients(mans);
       setTrainers(t);
       setRoutines(r);
       if (user) {
@@ -287,6 +298,22 @@ export default function GimnasioPage() {
     }
   };
 
+  const handleDeleteManual = async () => {
+    if (!deleteManualTarget) return;
+    setDeletingManual(true);
+    try {
+      await deleteManualClient(deleteManualTarget.id);
+      // Optimista en el lugar, sin recarga ni salto
+      setManualClients((prev) => prev.filter((c) => c.id !== deleteManualTarget.id));
+      toast.success(`${deleteManualTarget.name} eliminado`);
+      setDeleteManualTarget(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo eliminar");
+    } finally {
+      setDeletingManual(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 py-8">
@@ -318,131 +345,132 @@ export default function GimnasioPage() {
         <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
           <div className="h-2 w-full" style={{ backgroundColor: brand }} />
           <div className="p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-            {gym.logo_url ? (
-              <Image
-                src={gym.logo_url}
-                alt={gym.name}
-                width={88}
-                height={88}
-                className="rounded-2xl object-cover bg-slate-100 shrink-0"
-                style={{ width: 88, height: 88 }}
-              />
-            ) : (
-              <div
-                className="flex h-[88px] w-[88px] shrink-0 items-center justify-center rounded-2xl text-3xl font-bold text-white"
-                style={{ backgroundColor: brand }}
-              >
-                {gym.name.charAt(0).toUpperCase()}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold text-slate-900">{gym.name}</h1>
-                {isMember && (
-                  <span
-                    className="rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
-                    style={{ backgroundColor: brand }}
-                  >
-                    {myBadge}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+              {gym.logo_url ? (
+                <Image
+                  src={gym.logo_url}
+                  alt={gym.name}
+                  width={88}
+                  height={88}
+                  className="rounded-2xl object-cover bg-slate-100 shrink-0"
+                  style={{ width: 88, height: 88 }}
+                />
+              ) : (
+                <div
+                  className="flex h-[88px] w-[88px] shrink-0 items-center justify-center rounded-2xl text-3xl font-bold text-white"
+                  style={{ backgroundColor: brand }}
+                >
+                  {gym.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl font-bold text-slate-900">{gym.name}</h1>
+                  {isMember && (
+                    <span
+                      className="rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
+                      style={{ backgroundColor: brand }}
+                    >
+                      {myBadge}
+                    </span>
+                  )}
+                </div>
+                {gym.description && <p className="mt-1 text-sm text-slate-600">{gym.description}</p>}
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
+                  <span className="flex items-center gap-1">
+                    <Users className="h-4 w-4" />
+                    {members.length + manualClients.length}{" "}
+                    {members.length + manualClients.length === 1 ? "miembro" : "miembros"}
                   </span>
-                )}
+                  <span className="flex items-center gap-1">
+                    <Dumbbell className="h-4 w-4" />
+                    {routines.length} {routines.length === 1 ? "rutina" : "rutinas"}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <GraduationCap className="h-4 w-4" />
+                    {trainers.length} {trainers.length === 1 ? "profe" : "profes"}
+                  </span>
+                </div>
+                {/* Contacto / ubicación */}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {gym.phone && (
+                    <a href={`tel:${gym.phone}`} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200">
+                      <Phone className="h-3.5 w-3.5" />
+                      {gym.phone}
+                    </a>
+                  )}
+                  {gym.email && (
+                    <a href={`mailto:${gym.email}`} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200">
+                      <Mail className="h-3.5 w-3.5" />
+                      {gym.email}
+                    </a>
+                  )}
+                  {gym.instagram && (
+                    <a href={instagramUrl(gym.instagram)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200">
+                      <Instagram className="h-3.5 w-3.5" />
+                      Instagram
+                    </a>
+                  )}
+                  {gym.website && (
+                    <a href={websiteUrl(gym.website)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200">
+                      <Globe className="h-3.5 w-3.5" />
+                      Sitio web
+                    </a>
+                  )}
+                  {mapsUrl && (
+                    <a href={mapsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {gym.address ?? "Cómo llegar"}
+                    </a>
+                  )}
+                </div>
               </div>
-              {gym.description && <p className="mt-1 text-sm text-slate-600">{gym.description}</p>}
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
-                <span className="flex items-center gap-1">
-                  <Users className="h-4 w-4" />
-                  {members.length} {members.length === 1 ? "miembro" : "miembros"}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Dumbbell className="h-4 w-4" />
-                  {routines.length} {routines.length === 1 ? "rutina" : "rutinas"}
-                </span>
-                <span className="flex items-center gap-1">
-                  <GraduationCap className="h-4 w-4" />
-                  {trainers.length} {trainers.length === 1 ? "profe" : "profes"}
-                </span>
-              </div>
-              {/* Contacto / ubicación */}
-              <div className="mt-3 flex flex-wrap gap-2">
-                {gym.phone && (
-                  <a href={`tel:${gym.phone}`} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200">
-                    <Phone className="h-3.5 w-3.5" />
-                    {gym.phone}
-                  </a>
+              <div className="flex shrink-0 flex-col gap-2">
+                {isAdmin && (
+                  <Link
+                    href={`/gimnasios/${gym.id}/editar`}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    Editar
+                  </Link>
                 )}
-                {gym.email && (
-                  <a href={`mailto:${gym.email}`} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200">
-                    <Mail className="h-3.5 w-3.5" />
-                    {gym.email}
-                  </a>
+                {amTrainer && (
+                  <Link
+                    href={`/gimnasios/${gym.id}/disponibilidad`}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <CalendarClock className="h-4 w-4" />
+                    Mi disponibilidad
+                  </Link>
                 )}
-                {gym.instagram && (
-                  <a href={instagramUrl(gym.instagram)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200">
-                    <Instagram className="h-3.5 w-3.5" />
-                    Instagram
-                  </a>
+                {isManager && (
+                  <Button
+                    variant="outline"
+                    onClick={handleCopyInvite}
+                  >
+                    <Link2 className="h-4 w-4 mr-1.5" />
+                    Copiar invitación
+                  </Button>
                 )}
-                {gym.website && (
-                  <a href={websiteUrl(gym.website)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200">
-                    <Globe className="h-3.5 w-3.5" />
-                    Sitio web
-                  </a>
-                )}
-                {mapsUrl && (
-                  <a href={mapsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {gym.address ?? "Cómo llegar"}
-                  </a>
-                )}
+                {isMember && myRole !== "owner" ? (
+                  <Button
+                    variant="outline"
+                    onClick={() => setConfirmLeave(true)}
+                    className="border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    Salir
+                  </Button>
+                ) : null}
+                {!isMember ? (
+                  <p className="rounded-lg bg-slate-100 px-4 py-2 text-xs font-medium text-slate-600">
+                    {memberOfOther
+                      ? "Ya pertenecés a otro gimnasio."
+                      : "Solo un profesor puede agregarte."}
+                  </p>
+                ) : null}
               </div>
             </div>
-            <div className="flex shrink-0 flex-col gap-2">
-              {isAdmin && (
-                <Link
-                  href={`/gimnasios/${gym.id}/editar`}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  <Pencil className="h-4 w-4" />
-                  Editar
-                </Link>
-              )}
-              {amTrainer && (
-                <Link
-                  href={`/gimnasios/${gym.id}/disponibilidad`}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  <CalendarClock className="h-4 w-4" />
-                  Mi disponibilidad
-                </Link>
-              )}
-              {isManager && (
-                <Button
-                  variant="outline"
-                  onClick={handleCopyInvite}
-                >
-                  <Link2 className="h-4 w-4 mr-1.5" />
-                  Copiar invitación
-                </Button>
-              )}
-              {isMember && myRole !== "owner" ? (
-                <Button
-                  variant="outline"
-                  onClick={() => setConfirmLeave(true)}
-                  className="border-red-200 text-red-600 hover:bg-red-50"
-                >
-                  Salir
-                </Button>
-              ) : null}
-              {!isMember ? (
-                <p className="rounded-lg bg-slate-100 px-4 py-2 text-xs font-medium text-slate-600">
-                  {memberOfOther
-                    ? "Ya pertenecés a otro gimnasio."
-                    : "Solo un profesor puede agregarte."}
-                </p>
-              ) : null}
-            </div>
-          </div>
           </div>
         </div>
 
@@ -488,9 +516,9 @@ export default function GimnasioPage() {
           </div>
         )}
 
-        {/* Tabs */}
+        {/* Tabs (Pases/Caja solo para gestión: owner/admin/profe) */}
         <div className="flex gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
-          {TABS.map((t) => (
+          {TABS.filter((t) => (t.key !== "pases" && t.key !== "caja") || isManager).map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
@@ -515,113 +543,113 @@ export default function GimnasioPage() {
               />
             ) : (
               <>
-            {isManager && (
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href={`/gimnasios/${gym.id}/rutinas/nueva`}
-                  className="inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-white"
-                  style={{ backgroundColor: brand }}
-                >
-                  + Nueva rutina del gym
-                </Link>
-                <Button variant="outline" onClick={() => setShowPublish((v) => !v)}>
-                  Publicar una de mis rutinas
-                </Button>
-              </div>
-            )}
-            {isManager && showPublish && (
-              <div className="flex flex-col gap-2 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:flex-row">
-                <select
-                  value={publishId}
-                  onChange={(e) => setPublishId(e.target.value)}
-                  className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="">Elegí una de tus rutinas…</option>
-                  {myRoutines.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
-                </select>
-                <Button onClick={handlePublish} disabled={publishing || !publishId}>
-                  {publishing ? "Publicando…" : "Publicar como plantilla"}
-                </Button>
-              </div>
-            )}
-            {routines.length === 0 ? (
-              <EmptyState
-                title="Sin rutinas todavía"
-                description="Cuando el gimnasio publique rutinas van a aparecer acá."
-              />
-            ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {routines.map((r) => (
-                  <div key={r.id} className="flex flex-col rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-                    <h3 className="text-base font-semibold text-slate-900">{r.name}</h3>
-                    {r.description && <p className="mt-1 text-sm text-slate-600 line-clamp-2">{r.description}</p>}
-                    <p className="mt-2 text-xs text-slate-500">
-                      {r.exercisesCount} {r.exercisesCount === 1 ? "ejercicio" : "ejercicios"}
-                      {r.category ? ` · ${r.category}` : ""}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {isMember && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleFork(r.id, r.name)}
-                          disabled={forkingId === r.id}
-                          className="text-white"
-                          style={{ backgroundColor: brand }}
-                        >
-                          <BookmarkPlus className="h-4 w-4 mr-1" />
-                          {forkingId === r.id ? "Guardando…" : "Guardar copia"}
-                        </Button>
-                      )}
-                      {isManager && (
-                        <Link
-                          href={`/rutinas/${r.id}/editar`}
-                          className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        >
-                          <Pencil className="h-3.5 w-3.5 mr-1" />
-                          Editar
-                        </Link>
-                      )}
-                      {isManager && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setDeleteTarget(r)}
-                          className="border-red-200 text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-1" />
-                          Quitar
-                        </Button>
-                      )}
-                    </div>
-                    {isManager && (
-                      <div className="mt-2 flex gap-2">
-                        <select
-                          value={assignTarget[r.id] ?? ""}
-                          onChange={(e) => setAssignTarget((p) => ({ ...p, [r.id]: e.target.value }))}
-                          className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
-                        >
-                          <option value="">Asignar a…</option>
-                          {members.map((m) => (
-                            <option key={m.user_id} value={m.user_id}>{m.name} ({ROLE_LABEL[m.role]})</option>
-                          ))}
-                        </select>
-                        <Button size="sm" variant="outline" onClick={() => handleAssign(r.id)} disabled={assigningId === r.id}>
-                          <Send className="h-3.5 w-3.5 mr-1" />
-                          {assigningId === r.id ? "…" : "Asignar"}
-                        </Button>
-                      </div>
-                    )}
+                {isManager && (
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href={`/gimnasios/${gym.id}/rutinas/nueva`}
+                      className="inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-white"
+                      style={{ backgroundColor: brand }}
+                    >
+                      + Nueva rutina del gym
+                    </Link>
+                    <Button variant="outline" onClick={() => setShowPublish((v) => !v)}>
+                      Publicar una de mis rutinas
+                    </Button>
                   </div>
-                ))}
-              </div>
-            )}
-            {routines.length > 0 && (
-              <p className="text-xs text-slate-500">
-                Guardar crea una copia privada en tu cuenta: si el gimnasio borra la original, tu copia y tu historial quedan intactos.
-              </p>
-            )}
+                )}
+                {isManager && showPublish && (
+                  <div className="flex flex-col gap-2 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:flex-row">
+                    <select
+                      value={publishId}
+                      onChange={(e) => setPublishId(e.target.value)}
+                      className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">Elegí una de tus rutinas…</option>
+                      {myRoutines.map((r) => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))}
+                    </select>
+                    <Button onClick={handlePublish} disabled={publishing || !publishId}>
+                      {publishing ? "Publicando…" : "Publicar como plantilla"}
+                    </Button>
+                  </div>
+                )}
+                {routines.length === 0 ? (
+                  <EmptyState
+                    title="Sin rutinas todavía"
+                    description="Cuando el gimnasio publique rutinas van a aparecer acá."
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    {routines.map((r) => (
+                      <div key={r.id} className="flex flex-col rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+                        <h3 className="text-base font-semibold text-slate-900">{r.name}</h3>
+                        {r.description && <p className="mt-1 text-sm text-slate-600 line-clamp-2">{r.description}</p>}
+                        <p className="mt-2 text-xs text-slate-500">
+                          {r.exercisesCount} {r.exercisesCount === 1 ? "ejercicio" : "ejercicios"}
+                          {r.category ? ` · ${r.category}` : ""}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {isMember && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleFork(r.id, r.name)}
+                              disabled={forkingId === r.id}
+                              className="text-white"
+                              style={{ backgroundColor: brand }}
+                            >
+                              <BookmarkPlus className="h-4 w-4 mr-1" />
+                              {forkingId === r.id ? "Guardando…" : "Guardar copia"}
+                            </Button>
+                          )}
+                          {isManager && (
+                            <Link
+                              href={`/rutinas/${r.id}/editar`}
+                              className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                              <Pencil className="h-3.5 w-3.5 mr-1" />
+                              Editar
+                            </Link>
+                          )}
+                          {isManager && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDeleteTarget(r)}
+                              className="border-red-200 text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-1" />
+                              Quitar
+                            </Button>
+                          )}
+                        </div>
+                        {isManager && (
+                          <div className="mt-2 flex gap-2">
+                            <select
+                              value={assignTarget[r.id] ?? ""}
+                              onChange={(e) => setAssignTarget((p) => ({ ...p, [r.id]: e.target.value }))}
+                              className="flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+                            >
+                              <option value="">Asignar a…</option>
+                              {members.map((m) => (
+                                <option key={m.user_id} value={m.user_id}>{m.name} ({ROLE_LABEL[m.role]})</option>
+                              ))}
+                            </select>
+                            <Button size="sm" variant="outline" onClick={() => handleAssign(r.id)} disabled={assigningId === r.id}>
+                              <Send className="h-3.5 w-3.5 mr-1" />
+                              {assigningId === r.id ? "…" : "Asignar"}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {routines.length > 0 && (
+                  <p className="text-xs text-slate-500">
+                    Guardar crea una copia privada en tu cuenta: si el gimnasio borra la original, tu copia y tu historial quedan intactos.
+                  </p>
+                )}
               </>
             )}
           </div>
@@ -671,26 +699,26 @@ export default function GimnasioPage() {
                       );
                     })()}
                     <div className="mt-2 flex flex-wrap gap-2">
-                    {t.user_id === user?.id && (
-                      <Link
-                        href={`/gimnasios/${gym.id}/disponibilidad`}
-                        className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        <CalendarClock className="h-3.5 w-3.5 mr-1" />
-                        Editar disponibilidad
-                      </Link>
-                    )}
-                    {isAdmin && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-red-200 text-red-600 hover:bg-red-50"
-                        disabled={actingMember === t.user_id + "trainer"}
-                        onClick={() => handleTrainerToggle(t.user_id, true, t.name)}
-                      >
-                        Quitar como profe
-                      </Button>
-                    )}
+                      {t.user_id === user?.id && (
+                        <Link
+                          href={`/gimnasios/${gym.id}/disponibilidad`}
+                          className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          <CalendarClock className="h-3.5 w-3.5 mr-1" />
+                          Editar disponibilidad
+                        </Link>
+                      )}
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-red-200 text-red-600 hover:bg-red-50"
+                          disabled={actingMember === t.user_id + "trainer"}
+                          onClick={() => handleTrainerToggle(t.user_id, true, t.name)}
+                        >
+                          Quitar como profe
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -709,119 +737,194 @@ export default function GimnasioPage() {
               />
             ) : (
               <>
-            {isManager && (
-              <div className="space-y-2 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-              <form onSubmit={handleAddByEmail} className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  type="email"
-                  placeholder="cliente@mail.com — debe tener cuenta creada"
-                  className="flex-1"
-                />
-                <Button type="submit" disabled={adding || !email.trim()} style={{ backgroundColor: brand }} className="text-white">
-                  <UserPlus className="h-4 w-4 mr-1.5" />
-                  {adding ? "Agregando…" : "Agregar cliente"}
-                </Button>
-              </form>
-              <p className="text-xs text-slate-500">
-                O compartí el link de invitación (botón “Copiar invitación” arriba): el cliente crea su cuenta y acepta desde ahí.
-              </p>
-              </div>
-            )}
-            <div className="divide-y divide-slate-200/60 dark:divide-white/10 rounded-xl bg-white shadow-sm ring-1 ring-slate-200 dark:ring-white/10">
-              {members.map((m) => (
-                <div key={m.user_id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                  {m.avatar_url ? (
-                    <Image
-                      src={m.avatar_url}
-                      alt={m.name}
-                      width={40}
-                      height={40}
-                      className="rounded-full object-cover shrink-0"
-                      style={{ width: 40, height: 40 }}
-                    />
-                  ) : (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-600">
-                      {m.name.charAt(0).toUpperCase()}
+                {isManager && (
+                  <div className="space-y-2 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                    <form onSubmit={handleAddByEmail} className="flex flex-col gap-2 sm:flex-row">
+                      <Input
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        type="email"
+                        placeholder="cliente@mail.com — debe tener cuenta creada"
+                        className="flex-1"
+                      />
+                      <Button type="submit" disabled={adding || !email.trim()} style={{ backgroundColor: brand }} className="text-white">
+                        <UserPlus className="h-4 w-4 mr-1.5" />
+                        {adding ? "Agregando…" : "Agregar cliente"}
+                      </Button>
+                    </form>
+                    <p className="text-xs text-slate-500">
+                      O compartí el link de invitación (botón “Copiar invitación” arriba): el cliente crea su cuenta y acepta desde ahí.
+                    </p>
+                  </div>
+                )}
+                <div className="divide-y divide-slate-200/60 dark:divide-white/10 rounded-xl bg-white shadow-sm ring-1 ring-slate-200 dark:ring-white/10">
+                  {members.map((m) => (
+                    <div key={m.user_id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                      {m.avatar_url ? (
+                        <Image
+                          src={m.avatar_url}
+                          alt={m.name}
+                          width={40}
+                          height={40}
+                          className="rounded-full object-cover shrink-0"
+                          style={{ width: 40, height: 40 }}
+                        />
+                      ) : (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-600">
+                          {m.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">{m.name}</p>
+                      {m.is_trainer && (
+                        <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700">
+                          Profesor
+                        </span>
+                      )}
+                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                        {ROLE_LABEL[m.role] ?? m.role}
+                      </span>
+                      {(() => {
+                        const isSelf = m.user_id === user?.id;
+                        const isOwnerRow = m.role === "owner";
+                        // Ser profe es una ficha aparte del rol: el dueño también
+                        // puede ser profesor (solo owner/admin gestiona profes,
+                        // incluso a sí mismo). Expulsar/cambiar roles sigue
+                        // bloqueado para uno mismo y para el dueño.
+                        const canToggleTrainer = isAdmin;
+                        const canManageRole =
+                          isManager && !isSelf && !isOwnerRow;
+                        if (!canToggleTrainer && !canManageRole) return null;
+                        return (
+                          <div className="flex flex-wrap gap-1">
+                            {canToggleTrainer && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={actingMember === m.user_id + "trainer"}
+                                onClick={() => handleTrainerToggle(m.user_id, m.is_trainer, m.name)}
+                              >
+                                {m.is_trainer ? "Quitar profe" : "Hacer profe"}
+                              </Button>
+                            )}
+                            {canManageRole && (
+                              <>
+                                {isAdmin && m.role === "member" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={actingMember === m.user_id + "make_admin"}
+                                    onClick={() => handleMemberAction(m.user_id, "make_admin", `${m.name} ahora es admin`)}
+                                  >
+                                    Hacer admin
+                                  </Button>
+                                )}
+                                {myRole === "owner" && m.role === "admin" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={actingMember === m.user_id + "remove_admin"}
+                                    onClick={() => handleMemberAction(m.user_id, "remove_admin", `${m.name} volvió a miembro`)}
+                                  >
+                                    Quitar admin
+                                  </Button>
+                                )}
+                                {(isAdmin || (amTrainer && m.role === "member")) && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-red-200 text-red-600 hover:bg-red-50"
+                                    disabled={actingMember === m.user_id + "remove"}
+                                    onClick={() => handleMemberAction(m.user_id, "remove", `${m.name} eliminado del gym`)}
+                                  >
+                                    Quitar
+                                  </Button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
-                  )}
-                  <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">{m.name}</p>
-                  {m.is_trainer && (
-                    <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-700">
-                      Profesor
-                    </span>
-                  )}
-                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                    {ROLE_LABEL[m.role] ?? m.role}
-                  </span>
-                  {(() => {
-                    const isSelf = m.user_id === user?.id;
-                    const isOwnerRow = m.role === "owner";
-                    // Ser profe es una ficha aparte del rol: el dueño también
-                    // puede ser profesor (solo owner/admin gestiona profes,
-                    // incluso a sí mismo). Expulsar/cambiar roles sigue
-                    // bloqueado para uno mismo y para el dueño.
-                    const canToggleTrainer = isAdmin;
-                    const canManageRole =
-                      isManager && !isSelf && !isOwnerRow;
-                    if (!canToggleTrainer && !canManageRole) return null;
-                    return (
-                    <div className="flex flex-wrap gap-1">
-                      {canToggleTrainer && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={actingMember === m.user_id + "trainer"}
-                          onClick={() => handleTrainerToggle(m.user_id, m.is_trainer, m.name)}
-                        >
-                          {m.is_trainer ? "Quitar profe" : "Hacer profe"}
-                        </Button>
+                  ))}
+                  {manualClients.map((mc) => (
+                    <div key={`manual-${mc.id}`} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                      {isManager ? (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-semibold text-amber-800">
+                          {mc.name.charAt(0).toUpperCase()}
+                        </div>
+                      ) : (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-600">
+                          {mc.name.charAt(0).toUpperCase()}
+                        </div>
                       )}
-                      {canManageRole && (
-                        <>
-                      {isAdmin && m.role === "member" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={actingMember === m.user_id + "make_admin"}
-                          onClick={() => handleMemberAction(m.user_id, "make_admin", `${m.name} ahora es admin`)}
-                        >
-                          Hacer admin
-                        </Button>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-slate-900">{mc.name}</p>
+                        {isManager && (
+                          <p className="truncate text-xs text-slate-500">
+                            {[mc.phone, mc.email].filter(Boolean).join(" · ") || "Sin contacto"} · sin cuenta
+                          </p>
+                        )}
+                      </div>
+                      {isManager ? (
+                        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                          Manual
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                          Miembro
+                        </span>
                       )}
-                      {myRole === "owner" && m.role === "admin" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={actingMember === m.user_id + "remove_admin"}
-                          onClick={() => handleMemberAction(m.user_id, "remove_admin", `${m.name} volvió a miembro`)}
-                        >
-                          Quitar admin
-                        </Button>
-                      )}
-                      {(isAdmin || (amTrainer && m.role === "member")) && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-red-200 text-red-600 hover:bg-red-50"
-                          disabled={actingMember === m.user_id + "remove"}
-                          onClick={() => handleMemberAction(m.user_id, "remove", `${m.name} eliminado del gym`)}
-                        >
-                          Quitar
-                        </Button>
-                      )}
-                        </>
+                      {isManager && (
+                        <div className="flex flex-wrap gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-red-200 text-red-600 hover:bg-red-50"
+                            onClick={() => setDeleteManualTarget(mc)}
+                          >
+                            Quitar
+                          </Button>
+                        </div>
                       )}
                     </div>
-                    );
-                  })()}
+                  ))}
                 </div>
-              ))}
-            </div>
+                {isManager && manualClients.length > 0 && (
+                  <p className="text-xs text-slate-500">
+                    Los manuales cuentan para caja y métricas pero sin cuenta no ven rutinas. Cuando creen su cuenta, agregalos por email arriba.
+                  </p>
+                )}
               </>
             )}
           </div>
+        )}
+
+        {tab === "pases" && (
+          <>
+            {!isManager ? (
+              <EmptyState
+                title="Solo gestión"
+                description="La caja y los pases solo los ve el dueño, admins y profes."
+                icon={Lock}
+              />
+            ) : (
+              <GymPasses gymId={gymId} members={members} brand={brand} isAdmin={isAdmin} currentUserId={user?.id ?? null} />
+            )}
+          </>
+        )}
+
+        {tab === "caja" && (
+          <>
+            {!isManager ? (
+              <EmptyState
+                title="Solo gestión"
+                description="La caja solo la ve el dueño, admins y profes."
+                icon={Lock}
+              />
+            ) : (
+              <GymCash gymId={gymId} members={members} brand={brand} />
+            )}
+          </>
         )}
       </div>
 
@@ -841,6 +944,15 @@ export default function GimnasioPage() {
         busy={deleting}
         onConfirm={handleDeleteRoutine}
         onCancel={() => setDeleteTarget(null)}
+      />
+      <ConfirmDialog
+        open={!!deleteManualTarget}
+        title="Quitar cliente manual"
+        description={`"${deleteManualTarget?.name}" se elimina con sus cobros. Solo usalo si fue un error de carga.`}
+        confirmLabel="Sí, quitar"
+        busy={deletingManual}
+        onConfirm={handleDeleteManual}
+        onCancel={() => setDeleteManualTarget(null)}
       />
     </div>
   );

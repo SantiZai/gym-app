@@ -74,7 +74,7 @@ export default function NuevaRutinaGymPage() {
             <span className="mb-1.5 block text-sm font-medium text-slate-700">Categoría <span className="font-normal text-slate-500">(opcional)</span></span>
             <Input value={categoria} onChange={(e) => setCategoria(e.target.value)} placeholder="Fuerza, Hipertrofia…" maxLength={50} className="h-11" />
           </label>
-          <Button type="submit" disabled={guardando} className="h-11 w-full bg-blue-600 hover:bg-blue-700">
+          <Button type="submit" disabled={guardando} className="h-11 w-full bg-blue-600 hover:bg-blue-700 text-white">
             {guardando ? "Creando…" : "Crear y agregar ejercicios"}
           </Button>
         </form>
