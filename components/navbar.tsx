@@ -196,6 +196,22 @@ export function Navbar() {
                         <LogOut className="h-4 w-4 text-red-600" />
                         <span className="text-sm font-medium text-red-600">Cerrar sesión</span>
                       </button>
+                      <div className="px-4 py-3 border-b border-slate-200 flex flex-col gap-1">
+                        <Link
+                          href="/privacidad"
+                          onClick={() => setIsDropdownOpen(false)}
+                          className="text-sm font-medium text-slate-700 hover:text-blue-600"
+                        >
+                          Privacidad
+                        </Link>
+                        <Link
+                          href="/terminos"
+                          onClick={() => setIsDropdownOpen(false)}
+                          className="text-sm font-medium text-slate-700 hover:text-blue-600"
+                        >
+                          Términos y condiciones
+                        </Link>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -355,6 +371,10 @@ export function Navbar() {
               </Link>
             </div>
           )}
+          <div className="text-center text-xs text-slate-600 mt-2 flex flex-col gap-1 items-start">
+            <a href="/privacidad" className="hover:text-blue-600 underline-none">Privacidad</a>
+            <a href="/terminos" className="hover:text-blue-600 underline-none">Términos y condiciones</a>
+          </div>
           <p className="mt-3 text-center text-[11px] text-slate-400">{APP_VERSION}</p>
         </div>
       </div>
