@@ -1,904 +1,97 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import {
-    ArrowLeft,
-    Plus,
-    Trash2,
-    ChevronUp,
-    ChevronDown,
-    Copy,
-    Search,
-    X
-} from "lucide-react";
-import { Routine, Exercise, Serie, RoutineExercise } from "@/types/db";
-import {
-    getRoutineById,
-    getRoutineExercises,
-    getSeriesByRoutineExerciseId,
-    updateRoutine,
-    createRoutineExercise,
-    updateRoutineExercise,
-    deleteRoutineExercise,
-    createSerie,
-    updateSerie,
-    deleteSerie
-} from "@/utils/routineUtils";
-import { getExercisesByIds, getExercises } from "@/utils/exercisesUtils";
-import { SwipeableRow } from "@/components/shared/SwipeableRow";
-import { StepperInput } from "@/components/shared/StepperInput";
-import { MUSCLES, muscleName } from "@/lib/muscles";
-import { equipmentLabel } from "@/lib/exerciseLabels";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { FilterSelect } from "@/components/shared/FilterSelect";
-import { toast } from "sonner";
-
-const TIPOS_SERIE = [
-    { value: "normal", label: "Normal", color: "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300" },
-    { value: "warm-up", label: "Calentamiento", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-300" },
-    { value: "dropset", label: "Dropset", color: "bg-slate-100 text-slate-800" },
-    { value: "otro", label: "Otro", color: "bg-slate-100 text-slate-800" }
-];
-
-interface MappedExercise extends Exercise {
-    routine_exercise_id?: string | null;
-    orden?: number | null;
-    notes?: string | null;
-    series: Serie[];
-}
-
-interface RoutineComplete extends Routine {
-    exercises: MappedExercise[];
-}
+import { AlertCircle, ArrowLeft } from "lucide-react";
+import type { EditableRoutine } from "@/types/routine";
+import { getRoutineFull } from "@/utils/routineUtils";
+import { RoutineEditor } from "@/components/routine/RoutineEditor";
 
 export default function EditarRutinaPage() {
     const params = useParams();
-    const router = useRouter();
-    const rutinaId = params.id as string;
+    const routineId = params.id as string;
 
-    const [rutina, setRutina] = useState<RoutineComplete | null>(null);
+    const [routine, setRoutine] = useState<EditableRoutine | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadFailed, setLoadFailed] = useState(false);
     const [retryKey, setRetryKey] = useState(0);
-    const [guardando, setGuardando] = useState(false);
-
-    const [routineExercises, setRoutineExercises] = useState<RoutineExercise[]>([]);
-
-    // Modal / picker states
-    const [pickerOpen, setPickerOpen] = useState(false);
-    const [ejercicioAEliminar, setEjercicioAEliminar] = useState<number | null>(null);
-    const [allExercises, setAllExercises] = useState<Exercise[]>([]);
-    const [filteredExercises, setFilteredExercises] = useState<Exercise[]>([]);
-    const [searchText, setSearchText] = useState("");
-    const [filterMuscle, setFilterMuscle] = useState("");
-    const [filterType, setFilterType] = useState("");
-    const [filterEquipment, setFilterEquipment] = useState("");
 
     useEffect(() => {
-        const loadRoutineData = async () => {
-            try {
-                setLoading(true);
-                setLoadFailed(false);
-                const routine: Routine = await getRoutineById(rutinaId);
-                const routineExercises: RoutineExercise[] = await getRoutineExercises(rutinaId);
-                const exerciseIds: string[] = routineExercises.map((re) => re.exercise_id);
-                const exercisesFromApi: Exercise[] = await getExercisesByIds(exerciseIds);
+        if (!routineId) return;
 
-                // Mapear ejercicios: asignar routine_exercise_id, orden, notes y cargar series existentes
-                const exercisesMapped: MappedExercise[] = await Promise.all(
-                    exercisesFromApi.map(async (ex) => {
-                        const re = routineExercises.find((r) => r.exercise_id === ex.id);
-                        let series: Serie[] = [];
+        let alive = true;
+        setLoading(true);
+        setLoadFailed(false);
 
-                        // Cargar series existentes si tiene routine_exercise_id
-                        if (re?.id) {
-                            try {
-                                const seriesData = await getSeriesByRoutineExerciseId(re.id);
-                                // Convertir los datos de la DB al formato esperado
-                                series = seriesData.map((s: { id: string; routine_exercise_id: string; type: string; reps: number | string; weight: number | string | null; orden: number; notes: string | null }) => ({
-                                    id: s.id,
-                                    routine_exercise_id: s.routine_exercise_id,
-                                    type: s.type as Serie["type"],
-                                    reps: String(s.reps),
-                                    weight: String(s.weight || '0'),
-                                    orden: s.orden,
-                                    notes: s.notes
-                                }));
-                            } catch (err) {
-                                console.error(`Error cargando series para ejercicio ${ex.id}:`, err);
-                            }
-                        }
-
-                        return {
-                            ...ex,
-                            routine_exercise_id: re?.id ?? null,
-                            orden: re?.orden ?? null,
-                            notes: re?.notes ?? null,
-                            series
-                        };
-                    })
-                );
-
-                // Ordenar ejercicios por el campo orden
-                const exercisesSorted = exercisesMapped.sort((a, b) => {
-                    const ordenA = a.orden ?? 0;
-                    const ordenB = b.orden ?? 0;
-                    return ordenA - ordenB;
+        getRoutineFull(routineId)
+            .then(({ routine: data, exercises }) => {
+                if (!alive) return;
+                setRoutine({
+                    id: data.id,
+                    name: data.name,
+                    description: data.description ?? "",
+                    public: data.public,
+                    exercises,
                 });
-
-                const completeRoutine: RoutineComplete = {
-                    ...routine,
-                    exercises: exercisesSorted
-                };
-
-                setRutina(completeRoutine);
-                setRoutineExercises(routineExercises);
-            } catch (error) {
-                console.error("Error loading routine:", error);
+            })
+            .catch((error) => {
+                console.error("Error cargando rutina:", error);
+                if (!alive) return;
                 setLoadFailed(true);
-            } finally {
+            })
+            .finally(() => {
+                if (!alive) return;
                 setLoading(false);
-            }
-        };
+            });
 
-        loadRoutineData();
-    }, [rutinaId, retryKey]);
-
-    // Cargar catálogo completo de ejercicios (para el picker) una sola vez
-    useEffect(() => {
-        let mounted = true;
-        (async () => {
-            try {
-                const all = await getExercises();
-                if (!mounted) return;
-                setAllExercises(all);
-                setFilteredExercises(all);
-            } catch (err) {
-                console.error("Error cargando ejercicios:", err);
-            }
-        })();
         return () => {
-            mounted = false;
+            alive = false;
         };
-    }, []);
-
-    // Filtrado en picker
-    useEffect(() => {
-        const lower = searchText.trim().toLowerCase();
-        const filtered = allExercises.filter((e) => {
-            const matchesSearch =
-                !lower ||
-                e.name.toLowerCase().includes(lower) ||
-                muscleName(e.primary_muscle_id).toLowerCase().includes(lower) ||
-                (e.instructions ?? "").toLowerCase().includes(lower);
-            const matchesMuscle = !filterMuscle || e.primary_muscle_id === filterMuscle;
-            const matchesType = !filterType || e.type === filterType;
-            const matchesEquipment = !filterEquipment || e.equipment === filterEquipment;
-            return matchesSearch && matchesMuscle && matchesType && matchesEquipment;
-        });
-        setFilteredExercises(filtered);
-    }, [allExercises, searchText, filterMuscle, filterType, filterEquipment]);
-
-    const musculos = useMemo(() => MUSCLES.filter((m) => allExercises.some((e) => e.primary_muscle_id === m.slug)).map((m) => m.slug), [allExercises]);
-    const musculoLabels = useMemo(() => Object.fromEntries(MUSCLES.map((m) => [m.slug, `${m.name} · ${m.region}`])), []);
-    const tipos = useMemo(() => [...new Set(allExercises.map((e) => e.type).filter((v): v is string => !!v))], [allExercises]);
-    const equipamientos = useMemo(() => [...new Set(allExercises.map((e) => e.equipment).filter((v): v is string => !!v))], [allExercises]);
-
-    // helper id temporal para nuevas series
-    const genTempId = () => `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-    // Agregar ejercicio desde picker: crea MappedExercise y lo agrega al final
-    const agregarEjercicioDesdePicker = (exercise: Exercise) => {
-        if (!rutina) return;
-        if (rutina.exercises.find((ex) => ex.id === exercise.id)) {
-            // ya agregado
-            return;
-        }
-        const nueva: MappedExercise = {
-            ...exercise,
-            routine_exercise_id: null, // pendiente de crear en DB al guardar
-            orden: (rutina.exercises.length ?? 0) + 1,
-            notes: null,
-            series: [] // vacías por ahora
-        };
-        setRutina((prev) => {
-            if (!prev) return prev;
-            return { ...prev, exercises: [...prev.exercises, nueva] };
-        });
-    };
-
-    // Agregar serie a un exercise (usa routine_exercise_id para relacionar cuando exista)
-    const agregarSerie = (routineExerciseId: string | null) => {
-        if (!rutina) return;
-        if (!routineExerciseId && !rutina) return;
-
-        setRutina((prev) => {
-            if (!prev) return prev;
-            const newExercises = prev.exercises.map((ex) => {
-                // match by routine_exercise_id OR by exercise id when rut_exercise_id is null
-                const matches =
-                    ex.routine_exercise_id === routineExerciseId ||
-                    (routineExerciseId === ex.id) ||
-                    (ex.routine_exercise_id === null && ex.id === routineExerciseId);
-                if (!matches) return ex;
-                const ultima = ex.series[ex.series.length - 1];
-                const nuevaSerie: Serie = {
-                    id: genTempId(),
-                    routine_exercise_id: ex.routine_exercise_id ?? "",
-                    type: "normal",
-                    reps: ultima?.reps ?? "0",
-                    weight: ultima?.weight ?? "0",
-                    orden: (ex.series.length ?? 0) + 1,
-                    notes: null
-                };
-                return { ...ex, series: [...ex.series, nuevaSerie] };
-            });
-            return { ...prev, exercises: newExercises };
-        });
-    };
-
-    const eliminarSerie = (exerciseId: string, serieId: string) => {
-        if (!rutina) return;
-
-        setRutina((prev) => {
-            if (!prev) return prev;
-            const newExercises = prev.exercises.map((ex) => {
-                if (ex.id !== exerciseId) return ex;
-                const filtered = ex.series.filter((s) => s.id !== serieId);
-                const recalculated = filtered.map((s, idx) => ({ ...s, orden: idx + 1 }));
-                return { ...ex, series: recalculated };
-            });
-            return { ...prev, exercises: newExercises };
-        });
-    };
-
-    const actualizarSerie = (exerciseId: string, serieId: string, campo: keyof Serie, valor: Serie[keyof Serie]) => {
-        if (!rutina) return;
-
-        setRutina((prev) => {
-            if (!prev) return prev;
-            const newExercises = prev.exercises.map((ex) => {
-                if (ex.id !== exerciseId) return ex;
-                const newSeries = ex.series.map((s) => (s.id === serieId ? { ...s, [campo]: valor } as Serie : s));
-                return { ...ex, series: newSeries };
-            });
-            return { ...prev, exercises: newExercises };
-        });
-    };
-
-    const moverSerie = (exerciseId: string, serieIndex: number, direccion: "up" | "down") => {
-        if (!rutina) return;
-
-        setRutina((prev) => {
-            if (!prev) return prev;
-            const newExercises = prev.exercises.map((ex) => {
-                if (ex.id !== exerciseId) return ex;
-                const arr = [...ex.series];
-                const targetIndex = direccion === "up" ? serieIndex - 1 : serieIndex + 1;
-                if (targetIndex < 0 || targetIndex >= arr.length) return ex;
-                [arr[serieIndex], arr[targetIndex]] = [arr[targetIndex], arr[serieIndex]];
-                const recalculated = arr.map((s, idx) => ({ ...s, orden: idx + 1 }));
-                return { ...ex, series: recalculated };
-            });
-            return { ...prev, exercises: newExercises };
-        });
-    };
-
-    const duplicarSerie = (exerciseId: string, serieId: string) => {
-        if (!rutina) return;
-
-        setRutina((prev) => {
-            if (!prev) return prev;
-            const newExercises = prev.exercises.map((ex) => {
-                if (ex.id !== exerciseId) return ex;
-                const idx = ex.series.findIndex((s) => s.id === serieId);
-                if (idx === -1) return ex;
-                const serie = ex.series[idx];
-                const nueva: Serie = {
-                    ...serie,
-                    id: genTempId(),
-                    orden: idx + 2
-                } as Serie;
-                const arr = [...ex.series];
-                arr.splice(idx + 1, 0, nueva);
-                const recalculated = arr.map((s, i) => ({ ...s, orden: i + 1 }));
-                return { ...ex, series: recalculated };
-            });
-            return { ...prev, exercises: newExercises };
-        });
-    };
-
-    const moverEjercicio = (ejercicioIndex: number, direccion: "up" | "down") => {
-        if (!rutina) return;
-
-        setRutina((prev) => {
-            if (!prev) return prev;
-            const arr = [...prev.exercises];
-            const targetIndex = direccion === "up" ? ejercicioIndex - 1 : ejercicioIndex + 1;
-            if (targetIndex < 0 || targetIndex >= arr.length) return prev;
-            [arr[ejercicioIndex], arr[targetIndex]] = [arr[targetIndex], arr[ejercicioIndex]];
-            const ordered = arr.map((ex, idx) => ({ ...ex, orden: idx + 1 }));
-            return { ...prev, exercises: ordered };
-        });
-    };
-
-    const eliminarEjercicio = (ejercicioIndex: number) => {
-        setEjercicioAEliminar(ejercicioIndex);
-    };
-
-    const confirmarEliminarEjercicio = () => {
-        if (ejercicioAEliminar === null) return;
-        const ejercicioIndex = ejercicioAEliminar;
-        setEjercicioAEliminar(null);
-        setRutina((prev) => {
-            if (!prev) return prev;
-            const arr = [...prev.exercises];
-            arr.splice(ejercicioIndex, 1);
-            const ordered = arr.map((ex, idx) => ({ ...ex, orden: idx + 1 }));
-            return { ...prev, exercises: ordered };
-        });
-    };
-
-    const guardarRutina = async () => {
-        if (!rutina) return;
-
-        setGuardando(true);
-
-        try {
-            // 1. Actualizar información básica de la rutina
-            await updateRoutine(rutinaId, {
-                name: rutina.name,
-                description: rutina.description,
-                public: rutina.public
-            });
-
-            // 2. Obtener routine_exercises existentes en DB
-            const existingRoutineExercises = routineExercises;
-            const existingRoutineExerciseIds = new Set(existingRoutineExercises.map(re => re.id));
-
-            // 3. Procesar cada ejercicio en la rutina actual
-            for (let i = 0; i < rutina.exercises.length; i++) {
-                const exercise = rutina.exercises[i];
-                let routineExerciseId = exercise.routine_exercise_id;
-
-                // Si es un ejercicio nuevo (no tiene routine_exercise_id)
-                if (!routineExerciseId) {
-                    // Crear el routine_exercise
-                    const newRoutineExercise = await createRoutineExercise(
-                        rutinaId,
-                        exercise.id,
-                        i + 1,
-                        exercise.notes
-                    );
-                    routineExerciseId = newRoutineExercise.id;
-                } else {
-                    // Actualizar routine_exercise existente (orden y notas)
-                    await updateRoutineExercise(routineExerciseId, {
-                        orden: i + 1,
-                        notes: exercise.notes
-                    });
-                    // Marcar como procesado
-                    existingRoutineExerciseIds.delete(routineExerciseId);
-                }
-
-                // 4. Procesar series de este ejercicio
-                // Obtener series existentes de DB para este routine_exercise
-                let existingSeries: { id: string }[] = [];
-                if (routineExerciseId) {
-                    try {
-                        existingSeries = await getSeriesByRoutineExerciseId(routineExerciseId);
-                    } catch (err) {
-                        console.error("Error obteniendo series existentes:", err);
-                    }
-                }
-
-                const existingSerieIds = new Set(existingSeries.map(s => s.id));
-
-                // Procesar cada serie en el estado actual
-                if (routineExerciseId) {
-                    for (let j = 0; j < exercise.series.length; j++) {
-                        const serie = exercise.series[j];
-
-                        // Si la serie tiene un id temporal (empieza con "temp-"), es nueva
-                        if (serie.id.startsWith('temp-')) {
-                            // Crear nueva serie
-                            await createSerie(routineExerciseId, {
-                                type: serie.type,
-                                reps: serie.reps,
-                                weight: serie.weight,
-                                orden: j + 1,
-                                notes: serie.notes
-                            });
-                        } else {
-                            // Actualizar serie existente
-                            await updateSerie(serie.id, {
-                                type: serie.type,
-                                reps: serie.reps,
-                                weight: serie.weight,
-                                orden: j + 1,
-                                notes: serie.notes
-                            });
-                            existingSerieIds.delete(serie.id);
-                        }
-                    }
-
-                    // Eliminar series que ya no están en el ejercicio
-                    for (const serieId of existingSerieIds) {
-                        await deleteSerie(serieId);
-                    }
-                }
-            }
-
-            // 5. Eliminar routine_exercises que ya no están en la rutina
-            // (esto también eliminará sus series en cascada)
-            for (const routineExerciseId of existingRoutineExerciseIds) {
-                await deleteRoutineExercise(routineExerciseId);
-            }
-
-            toast.success("¡Rutina actualizada exitosamente!");
-            router.push("/rutinas");
-        } catch (error) {
-            console.error("Error guardando rutina:", error);
-            toast.error("Error al guardar la rutina. Por favor, intenta nuevamente.");
-        } finally {
-            setGuardando(false);
-        }
-    };
-
-    // resumen computado
-    const totalSeries = rutina?.exercises.reduce((total, ej) => total + (ej.series?.length || 0), 0) ?? 0;
-    const totalReps = rutina?.exercises.reduce((total, ej) => {
-        return total + (ej.series?.reduce((st, s) => st + (Number(s.reps) || 0), 0) || 0);
-    }, 0) ?? 0;
+    }, [routineId, retryKey]);
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-50 py-8">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-center items-center h-64">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                    </div>
+            <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+                <div className="mx-auto max-w-4xl space-y-4 px-4 py-6">
+                    <div className="h-14 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-white/10" />
+                    <div className="h-24 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-white/10" />
+                    <div className="h-44 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-white/10" />
+                    <div className="h-44 animate-pulse rounded-2xl bg-slate-200/70 dark:bg-white/10" />
                 </div>
             </div>
         );
     }
 
-    if (!rutina) {
+    if (loadFailed || !routine) {
         return (
-            <div className="min-h-screen bg-slate-50 py-8">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    {loadFailed ? (
-                        <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-                            <p className="text-lg font-semibold text-slate-900">No se pudo cargar la rutina</p>
-                            <p className="mt-2 text-sm text-slate-600">Revisá tu conexión e intentá de nuevo.</p>
-                            <button
-                                type="button"
-                                onClick={() => setRetryKey((k) => k + 1)}
-                                className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
-                            >
-                                Reintentar
-                            </button>
-                            <Link href="/rutinas" className="mt-3 inline-block text-sm text-blue-600 hover:text-blue-700">
-                                Volver a rutinas
-                            </Link>
-                        </div>
-                    ) : (
-                        <div className="text-center">
-                            <h1 className="text-2xl font-bold text-slate-900">Rutina no encontrada</h1>
-                            <Link href="/rutinas" className="text-blue-600 hover:text-blue-700 mt-4 inline-block">
-                                Volver a rutinas
-                            </Link>
-                        </div>
-                    )}
+            <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8 dark:bg-slate-950">
+                <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-white/10">
+                    <AlertCircle className="mx-auto h-10 w-10 text-red-500" />
+                    <h1 className="mt-3 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                        No se pudo cargar la rutina
+                    </h1>
+                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                        Revisá tu conexión e intentá de nuevo.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() => setRetryKey((key) => key + 1)}
+                        className="mt-6 w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+                    >
+                        Reintentar
+                    </button>
+                    <Link
+                        href="/rutinas"
+                        className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Volver a rutinas
+                    </Link>
                 </div>
             </div>
         );
     }
 
-    return (
-        <div className="min-h-screen bg-slate-50 py-8">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
-                <Link
-                    href="/rutinas"
-                    className="inline-flex items-center text-slate-600 hover:text-slate-900 transition-colors duration-200 mr-4"
-                >
-                    <ArrowLeft className="h-5 w-5 mr-1" />
-                    Volver
-                </Link>
-                <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center">
-                        <h1 className="text-3xl font-bold text-slate-900">Editar {rutina.name}</h1>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setPickerOpen(true)}
-                            className="inline-flex items-center px-3 py-2 bg-slate-100 text-slate-900 rounded-lg hover:bg-slate-200 md:px-4"
-                        >
-                            <Plus className="h-6 w-6 md:h-5 md:w-5 md:mr-2" />
-                            <span className="hidden md:inline">Agregar ejercicio</span>
-                        </button>
-
-                        <button
-                            onClick={guardarRutina}
-                            disabled={guardando}
-                            className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors duration-200 shadow-sm disabled:opacity-50 md:px-4"
-                        >
-                            {guardando ? (
-                                <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent md:mr-2"></div>
-                            ) : (
-                                <svg className="h-6 w-6 md:h-5 md:w-5 md:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                            )}
-                            <span className="hidden md:inline">{guardando ? "Guardando..." : "Guardar Cambios"}</span>
-                        </button>
-                    </div>
-                </div>
-
-                {/* Información de la rutina */}
-                <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-100 mb-8">
-                    <h2 className="text-lg font-semibold text-slate-900 mb-4">Información de la Rutina</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">Nombre</label>
-                            <input
-                                type="text"
-                                value={rutina.name}
-                                onChange={(e) => setRutina({ ...rutina, name: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm text-slate-900 placeholder-slate-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300"
-                                placeholder="Nombre de la rutina"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">Descripción</label>
-                            <input
-                                type="text"
-                                value={rutina.description || ""}
-                                onChange={(e) => setRutina({ ...rutina, description: e.target.value })}
-                                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm text-slate-900 placeholder-slate-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300"
-                                placeholder="Describe tu rutina"
-                            />
-                        </div>
-                    </div>
-                    {/* Resumen */}
-                    <div className="mt-8 bg-slate-100 rounded-xl p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-blue-600">{rutina.exercises.length}</div>
-                                <div className="text-sm text-slate-600 font-bold">Ejercicios</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-blue-600">{totalSeries}</div>
-                                <div className="text-sm text-slate-600 font-bold">Series Totales</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-blue-600">{Math.round(totalReps)}</div>
-                                <div className="text-sm text-slate-600 font-bold">Repeticiones Totales</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Lista de ejercicios */}
-                <div className="space-y-6">
-                    {rutina.exercises.map((ejercicio, ejercicioIndex) => (
-                        <div key={ejercicio.id} className="bg-white rounded-xl shadow-sm border border-slate-100">
-                            {/* Header del ejercicio */}
-                            <div className="p-6 border-b border-slate-200/60 dark:border-white/10">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-4">
-                                        <div className="flex flex-col space-y-1">
-                                            <button
-                                                onClick={() => moverEjercicio(ejercicioIndex, "up")}
-                                                disabled={ejercicioIndex === 0}
-                                                aria-label={`Subir ${ejercicio.name}`}
-                                                className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
-                                            >
-                                                <ChevronUp className="h-4 w-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => moverEjercicio(ejercicioIndex, "down")}
-                                                disabled={ejercicioIndex === rutina.exercises.length - 1}
-                                                aria-label={`Bajar ${ejercicio.name}`}
-                                                className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
-                                            >
-                                                <ChevronDown className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                        <div>
-                                            <h3 className="text-lg font-semibold text-slate-900">
-                                                {ejercicio.orden ?? ejercicioIndex + 1}. {ejercicio.name}
-                                            </h3>
-                                            <p className="text-sm text-slate-600">
-                                                {muscleName(ejercicio.primary_muscle_id)} • {ejercicio.equipment}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => agregarSerie(ejercicio.routine_exercise_id ?? ejercicio.id)}
-                                            className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors duration-200"
-                                        >
-                                            <Plus className="h-4 w-4 mr-1" />
-                                            Serie
-                                        </button>
-                                        <button
-                                            onClick={() => eliminarEjercicio(ejercicioIndex)}
-                                            className="inline-flex items-center px-3 py-2 bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 transition-colors duration-200 dark:bg-red-950/50 dark:text-red-300 dark:hover:bg-red-950"
-                                            title="Eliminar ejercicio"
-                                            aria-label={`Eliminar ${ejercicio.name} de la rutina`}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Series */}
-                            <div className="p-4 sm:p-6">
-                                <div className="divide-y divide-slate-200/60 dark:divide-white/10 overflow-hidden rounded-xl border border-slate-200 dark:border-white/10">
-                                    {/* Filas de series (deslizar en mobile para duplicar/eliminar) */}
-                                    {ejercicio.series.map((serie, serieIndex) => {
-                                        return (
-                                            <SwipeableRow
-                                                key={serie.id}
-                                                actionsWidth={96}
-                                                actions={
-                                                    <>
-                                                        <button
-                                                            onClick={() => duplicarSerie(ejercicio.id, serie.id)}
-                                                            aria-label="Duplicar serie"
-                                                            className="flex h-full w-12 items-center justify-center bg-blue-600 text-white"
-                                                        >
-                                                            <Copy className="h-4 w-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => eliminarSerie(ejercicio.id, serie.id)}
-                                                            disabled={ejercicio.series.length <= 1}
-                                                            aria-label="Eliminar serie"
-                                                            className="flex h-full w-12 items-center justify-center bg-red-600 text-white disabled:opacity-40"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </button>
-                                                    </>
-                                                }
-                                            >
-                                            <div className="bg-white px-3 py-2.5 hover:bg-slate-50 dark:bg-slate-900">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        {/* Número de serie */}
-                                                        <span className="w-5 text-center text-sm font-medium text-slate-900">
-                                                            {serieIndex + 1}
-                                                        </span>
-
-                                                        {/* Tipo de serie */}
-                                                        <select
-                                                            value={serie.type}
-                                                            onChange={(e) => actualizarSerie(ejercicio.id, serie.id, "type", e.target.value)}
-                                                            aria-label={`Tipo serie ${serieIndex + 1}`}
-                                                            className="w-28 px-2 py-2 text-xs font-medium bg-white border border-slate-200 rounded-lg shadow-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
-                                                        >
-                                                            {TIPOS_SERIE.map((tipo) => (
-                                                                <option key={tipo.value} value={tipo.value}>
-                                                                    {tipo.label}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-
-                                                    {/* Acciones (desktop) */}
-                                                    <div className="hidden items-center gap-0.5 sm:flex">
-                                                        <button
-                                                            onClick={() => moverSerie(ejercicio.id, serieIndex, "up")}
-                                                            disabled={serieIndex === 0}
-                                                            className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
-                                                            title="Mover arriba"
-                                                            aria-label={`Mover serie ${serieIndex + 1} arriba`}
-                                                        >
-                                                            <ChevronUp className="h-4 w-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => moverSerie(ejercicio.id, serieIndex, "down")}
-                                                            disabled={serieIndex === ejercicio.series.length - 1}
-                                                            className="p-2 text-slate-400 hover:text-slate-600 disabled:opacity-30"
-                                                            title="Mover abajo"
-                                                            aria-label={`Mover serie ${serieIndex + 1} abajo`}
-                                                        >
-                                                            <ChevronDown className="h-4 w-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => duplicarSerie(ejercicio.id, serie.id)}
-                                                            className="p-2 text-blue-500 hover:text-blue-700"
-                                                            title="Duplicar serie"
-                                                            aria-label={`Duplicar serie ${serieIndex + 1}`}
-                                                        >
-                                                            <Copy className="h-4 w-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => eliminarSerie(ejercicio.id, serie.id)}
-                                                            disabled={ejercicio.series.length <= 1}
-                                                            className="p-2 text-red-500 hover:text-red-700 disabled:opacity-30"
-                                                            title="Eliminar serie"
-                                                            aria-label={`Eliminar serie ${serieIndex + 1}`}
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                <div className="mt-2 flex items-center justify-center gap-4">
-                                                    {/* Peso */}
-                                                    <div className="flex items-center gap-1">
-                                                        <StepperInput
-                                                            value={serie.weight ?? ""}
-                                                            onChange={(v) => actualizarSerie(ejercicio.id, serie.id, "weight", v)}
-                                                            step={2.5}
-                                                            inputMode="decimal"
-                                                            ariaLabel={`Peso serie ${serieIndex + 1}`}
-                                                            inputWidthClass="w-20"
-                                                        />
-                                                        <span className="text-xs text-slate-500">kg</span>
-                                                    </div>
-
-                                                    {/* Repeticiones */}
-                                                    <div className="flex items-center gap-1">
-                                                        <StepperInput
-                                                            value={serie.reps ?? ""}
-                                                            onChange={(v) => actualizarSerie(ejercicio.id, serie.id, "reps", v)}
-                                                            step={1}
-                                                            inputMode="numeric"
-                                                            ariaLabel={`Reps serie ${serieIndex + 1}`}
-                                                            inputWidthClass="w-20"
-                                                        />
-                                                        <span className="text-xs text-slate-500">reps</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            </SwipeableRow>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Notas del ejercicio */}
-                                <div className="mt-4 pt-4 border-t border-slate-200">
-                                    <label className="block text-sm font-semibold text-slate-700 mb-2">Notas del ejercicio</label>
-                                    <textarea
-                                        value={ejercicio.notes ?? ""}
-                                        onChange={(e) => {
-                                            const nueva = { ...rutina };
-                                            const idx = nueva.exercises.findIndex((x) => x.id === ejercicio.id);
-                                            if (idx !== -1) {
-                                                nueva.exercises[idx] = { ...nueva.exercises[idx], notes: e.target.value };
-                                                setRutina(nueva);
-                                            }
-                                        }}
-                                        rows={2}
-                                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm text-slate-900 placeholder-slate-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300 resize-none"
-                                        placeholder="Notas adicionales para este ejercicio..."
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* ---------- PICKER MODAL ---------- */}
-            {pickerOpen && (
-                <div className="fixed inset-0 z-50 flex items-start justify-center pt-4 sm:pt-10 px-4">
-                    <div className="absolute inset-0 bg-black/40" onClick={() => setPickerOpen(false)} />
-                    <div className="relative w-full max-w-4xl bg-white rounded-lg shadow-lg overflow-hidden max-h-[95vh] sm:max-h-[90vh] flex flex-col">
-                        <div className="flex items-center justify-between flex-shrink-0">
-                            <h3 className="text-xl font-semibold p-4">Agregar ejercicios</h3>
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => setPickerOpen(false)} className="px-3 py-2 text-sm cursor-pointer">
-                                    <X className="h-6 w-6" />
-                                </button>
-                            </div>
-                        </div>
-                        <div className="p-4 flex-shrink-0">
-                            <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-                                <input
-                                    autoFocus
-                                    type="text"
-                                    value={searchText}
-                                    onChange={(e) => setSearchText(e.target.value)}
-                                    placeholder="Buscar ejercicios..."
-                                    className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm text-slate-900 placeholder-slate-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-slate-300"
-                                />
-                            </div>
-                        </div>
-                        <div className="p-4 border-b flex items-center justify-between flex-shrink-0">
-                            <div className="flex items-center w-full gap-3">
-                                <div className="w-full flex flex-col md:flex-row gap-3">
-                                    <FilterSelect
-                                        value={filterMuscle}
-                                        onChange={setFilterMuscle}
-                                        allLabel="Todos los músculos"
-                                        options={musculos}
-                                        labels={musculoLabels}
-                                        ariaLabel="Filtrar por músculo"
-                                    />
-                                    <FilterSelect
-                                        value={filterType}
-                                        onChange={setFilterType}
-                                        allLabel="Todos los tipos"
-                                        options={tipos}
-                                        ariaLabel="Filtrar por tipo de ejercicio"
-                                    />
-                                    <FilterSelect
-                                        value={filterEquipment}
-                                        onChange={setFilterEquipment}
-                                        allLabel="Todo el equipamiento"
-                                        options={equipamientos}
-                                        ariaLabel="Filtrar por equipamiento"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="p-4 overflow-y-auto flex-1 min-h-0">
-                            {filteredExercises.length === 0 ? (
-                                <div className="text-center py-12">
-                                    <p className="text-slate-500">No se encontraron ejercicios</p>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {filteredExercises.map((ej) => {
-                                        const ya = rutina?.exercises.some((ex) => ex.id === ej.id);
-                                        return (
-                                            <div
-                                                key={ej.id}
-                                                className={`p-3 border rounded-lg flex items-start justify-between ${ya ? "bg-blue-50 border-blue-200 dark:border-blue-800/40 dark:bg-blue-950/30" : "border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900"}`}
-                                            >
-                                                <div className="flex-1 min-w-0 pr-3">
-                                                    <h4 className="font-medium text-slate-900 break-words">{ej.name}</h4>
-                                                    <div className="text-xs text-slate-500 mt-1">{muscleName(ej.primary_muscle_id)} • {equipmentLabel(ej.equipment) ?? "—"}</div>
-                                                    <p className="text-xs text-slate-600 mt-2 line-clamp-2 break-words">{ej.instructions}</p>
-                                                </div>
-                                                <div>
-                                                    <button
-                                                        onClick={() => {
-                                                            if (!rutina) return;
-                                                            if (ya) {
-                                                                // remover si ya está
-                                                                setRutina((prev) => {
-                                                                    if (!prev) return prev;
-                                                                    const filtered = prev.exercises.filter((x) => x.id !== ej.id).map((x, i) => ({ ...x, orden: i + 1 }));
-                                                                    return { ...prev, exercises: filtered };
-                                                                });
-                                                            } else {
-                                                                agregarEjercicioDesdePicker(ej);
-                                                            }
-                                                        }}
-                                                        className={`px-3 py-2 rounded ${ya ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"}`}
-                                                    >
-                                                        {ya ? "Remover" : "Agregar"}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* ---------- END PICKER MODAL ---------- */}
-            <ConfirmDialog
-                open={ejercicioAEliminar !== null}
-                title="Eliminar ejercicio"
-                description="¿Estás seguro de que deseas eliminar este ejercicio? Esta acción eliminará también todas sus series."
-                confirmLabel="Eliminar"
-                onConfirm={confirmarEliminarEjercicio}
-                onCancel={() => setEjercicioAEliminar(null)}
-            />
-        </div>
-    );
+    return <RoutineEditor key={routine.id ?? routineId} mode="edit" routineId={routine.id ?? routineId} initialRoutine={routine} />;
 }

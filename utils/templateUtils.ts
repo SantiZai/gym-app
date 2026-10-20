@@ -1,6 +1,6 @@
 import { createClient } from "./supabase/client";
-import { getExercises } from "./exercisesUtils";
-import { createRoutineBasic, createSerie, getRoutineExercises } from "./routineUtils";
+import { getExercisesCached } from "./exercisesUtils";
+import { createRoutineBasic, getRoutineExercises } from "./routineUtils";
 import { matchTemplateExercises, type RoutineTemplate } from "@/lib/routineTemplates";
 
 export class MissingExercisesError extends Error {
@@ -14,7 +14,7 @@ export class MissingExercisesError extends Error {
 // Crea una rutina privada desde una plantilla, con ejercicios y series.
 // Devuelve el id de la rutina creada.
 export async function createRoutineFromTemplate(template: RoutineTemplate): Promise<string> {
-  const catalog = (await getExercises()) as { id: string; name: string }[];
+  const catalog = (await getExercisesCached()) as { id: string; name: string }[];
   const { matched, missing } = matchTemplateExercises(template, catalog ?? []);
   if (missing.length > 0) throw new MissingExercisesError(missing);
 
@@ -30,19 +30,30 @@ export async function createRoutineFromTemplate(template: RoutineTemplate): Prom
   });
 
   // Agregar series según la plantilla (sin pesos ni reps: los completa el usuario)
-  const newRes = await getRoutineExercises(routineId);
-  for (const m of matched) {
-    const target = newRes.find((nr) => nr.orden === m.orden && nr.exercise_id === m.exerciseId);
-    if (!target) continue;
-    for (let i = 0; i < m.sets; i++) {
-      await createSerie(target.id, {
-        type: "normal",
-        reps: m.reps != null ? String(m.reps) : "",
-        weight: "",
-        orden: i + 1,
-        notes: m.note,
-      });
-    }
+  const newRes = (await getRoutineExercises(routineId)) as {
+    id: string;
+    orden: number;
+    exercise_id: string;
+  }[];
+  const byKey = new Map(newRes.map((row) => [`${row.exercise_id}|${row.orden}`, row.id]));
+
+  const serieRows = matched.flatMap((m) => {
+    const routineExerciseId = byKey.get(`${m.exerciseId}|${m.orden}`);
+    if (!routineExerciseId) return [];
+    return Array.from({ length: m.sets }, (_, index) => ({
+      routine_exercise_id: routineExerciseId,
+      type: "normal",
+      reps: m.reps ?? 0,
+      weight: null,
+      orden: index + 1,
+      notes: m.note,
+    }));
+  });
+
+  if (serieRows.length > 0) {
+    const supabase = await createClient();
+    const { error } = await supabase.from("series").insert(serieRows);
+    if (error) throw error;
   }
 
   // Guardar categoría (best-effort, no bloquea si falla)

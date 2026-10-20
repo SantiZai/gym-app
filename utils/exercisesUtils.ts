@@ -1,3 +1,4 @@
+import type { Exercise } from "@/types/db"
 import { createClient } from "./supabase/client"
 
 export const getExerciseById = async (id: string) => {
@@ -35,6 +36,15 @@ export const getExercises = async () => {
         return []
     }
 
+    return data
+}
+
+let exercisesCache: Exercise[] | null = null
+
+export const getExercisesCached = async (force = false): Promise<Exercise[]> => {
+    if (!force && exercisesCache) return exercisesCache
+    const data = (await getExercises()) as Exercise[]
+    if (data.length > 0) exercisesCache = data
     return data
 }
 
